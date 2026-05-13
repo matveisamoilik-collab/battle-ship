@@ -1,0 +1,775 @@
+using UnityEngine;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEditor.Events;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.EventSystems;
+
+/// <summary>
+/// Builds the entire ShipButtlr game from scratch.
+/// Run via menu: ShipButtlr > Build All
+/// </summary>
+public static class GameSetup
+{
+    // -------------------------------------------------------------------------
+    // Entry point
+    // -------------------------------------------------------------------------
+
+    [MenuItem("ShipButtlr/Build All")]
+    static void BuildAll()
+    {
+        EnsureTags();
+        CreateFolders();
+
+        var mats = CreateMaterials();
+        var explosionPrefab = CreateExplosionPrefab();
+        var torpedoPrefab   = CreateTorpedoPrefab(explosionPrefab, mats["Torpedo"]);
+
+        BuildMainMenuScene();
+        BuildGameScene(mats, torpedoPrefab);
+        ConfigureBuildSettings();
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("[ShipButtlr] Build All complete. Open Assets/Scenes/MainMenu.unity and press Play.");
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. Register custom tags
+    // -------------------------------------------------------------------------
+
+    static void EnsureTags()
+    {
+        SerializedObject tagManager = new SerializedObject(
+            AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+        SerializedProperty tagsProp = tagManager.FindProperty("tags");
+
+        foreach (string tag in new[] { "Player", "Enemy", "Wall", "Island" })
+        {
+            bool found = false;
+            for (int i = 0; i < tagsProp.arraySize; i++)
+                if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag) { found = true; break; }
+
+            if (!found)
+            {
+                tagsProp.InsertArrayElementAtIndex(tagsProp.arraySize);
+                tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
+            }
+        }
+        tagManager.ApplyModifiedProperties();
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Create asset folders
+    // -------------------------------------------------------------------------
+
+    static void CreateFolders()
+    {
+        EnsureFolder("Assets", "Scripts");
+        EnsureFolder("Assets/Scripts", "Editor");
+        EnsureFolder("Assets", "Materials");
+        EnsureFolder("Assets", "Prefabs");
+    }
+
+    static void EnsureFolder(string parent, string child)
+    {
+        string path = parent + "/" + child;
+        if (!AssetDatabase.IsValidFolder(path))
+            AssetDatabase.CreateFolder(parent, child);
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. URP materials
+    // -------------------------------------------------------------------------
+
+    static System.Collections.Generic.Dictionary<string, Material> CreateMaterials()
+    {
+        var dict = new System.Collections.Generic.Dictionary<string, Material>();
+        dict["Player"]     = MakeMat("PlayerMaterial",     new Color(0.30f, 0.40f, 0.70f));
+        dict["Bot"]        = MakeMat("BotMaterial",        new Color(0.80f, 0.10f, 0.10f));
+        dict["Water"]      = MakeMat("WaterMaterial",      new Color(0.05f, 0.30f, 0.60f), smoothness: 0.8f, metallic: 0.1f);
+        dict["Torpedo"]    = MakeMat("TorpedoMaterial",    new Color(0.85f, 0.85f, 0.90f)); // silver-white, clearly visible
+        dict["Sand"]       = MakeMat("SandMaterial",       new Color(0.85f, 0.75f, 0.45f));
+        dict["Grass"]      = MakeMat("GrassMaterial",      new Color(0.25f, 0.55f, 0.20f));
+        dict["TreeTrunk"]  = MakeMat("TreeTrunkMaterial",  new Color(0.45f, 0.28f, 0.10f));
+        dict["TreeLeaves"] = MakeMat("TreeLeavesMaterial", new Color(0.15f, 0.45f, 0.15f));
+        return dict;
+    }
+
+    static Material MakeMat(string assetName, Color color,
+                             float smoothness = 0f, float metallic = 0f)
+    {
+        string path = "Assets/Materials/" + assetName + ".mat";
+
+        // Overwrite if it already exists from a previous run
+        var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existing != null) AssetDatabase.DeleteAsset(path);
+
+        var shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null)
+        {
+            Debug.LogError("[ShipButtlr] URP Lit shader not found. Make sure URP is active.");
+            shader = Shader.Find("Standard");
+        }
+        var mat = new Material(shader);
+        mat.SetColor("_BaseColor", color);  // URP uses _BaseColor, not _Color
+        mat.SetFloat("_Smoothness", smoothness);
+        mat.SetFloat("_Metallic",   metallic);
+        AssetDatabase.CreateAsset(mat, path);
+        return mat;
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Explosion particle prefab
+    // -------------------------------------------------------------------------
+
+    static GameObject CreateExplosionPrefab()
+    {
+        string path = "Assets/Prefabs/ExplosionEffect.prefab";
+        var go = new GameObject("ExplosionEffect");
+        var ps = go.AddComponent<ParticleSystem>();
+
+        var main = ps.main;
+        main.duration      = 0.5f;
+        main.loop          = false;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.6f);
+        main.startSpeed    = new ParticleSystem.MinMaxCurve(5f, 12f);
+        main.startSize     = new ParticleSystem.MinMaxCurve(0.5f, 1.5f);
+        main.stopAction    = ParticleSystemStopAction.Destroy;
+
+        // Orange/yellow gradient
+        var grad = new ParticleSystem.MinMaxGradient(
+            new Color(1f, 0.9f, 0f),       // yellow
+            new Color(1f, 0.4f, 0f));       // orange
+        main.startColor = grad;
+
+        var emission = ps.emission;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 30) });
+
+        // Ensure renderer uses URP-compatible material
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        var particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        if (particleShader == null) particleShader = Shader.Find("Particles/Standard Unlit");
+        if (particleShader != null)
+            renderer.material = new Material(particleShader);
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Torpedo prefab
+    // -------------------------------------------------------------------------
+
+    static GameObject CreateTorpedoPrefab(GameObject explosionPrefab, Material torpedoMat)
+    {
+        string path = "Assets/Prefabs/Torpedo.prefab";
+
+        // Root empty GO holds physics and logic
+        var root = new GameObject("Torpedo");
+
+        // Visual: cylinder child rotated so its long axis aligns with root's Z (forward)
+        var cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        cylinder.transform.SetParent(root.transform);
+        cylinder.transform.localPosition = Vector3.zero;
+        cylinder.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        cylinder.transform.localScale    = new Vector3(0.3f, 1.0f, 0.3f); // 2u long, 0.3u wide (spec: ~2 units)
+        cylinder.GetComponent<MeshRenderer>().sharedMaterial = torpedoMat;
+        Object.DestroyImmediate(cylinder.GetComponent<CapsuleCollider>()); // collider on root instead
+
+        // Physics on root
+        var rb = root.AddComponent<Rigidbody>();
+        rb.useGravity          = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+        // Capsule collider aligned to Z (direction=2)
+        var col = root.AddComponent<CapsuleCollider>();
+        col.direction = 2;
+        col.height    = 2.0f;  // matches the 2-unit visual length
+        col.radius    = 0.15f;
+
+        // Trail renderer — thin white wake
+        var trail = root.AddComponent<TrailRenderer>();
+        trail.time         = 0.3f;
+        trail.startWidth   = 0.25f;
+        trail.endWidth     = 0f;
+        trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        var trailShader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (trailShader == null) trailShader = Shader.Find("Unlit/Color");
+        if (trailShader != null)
+        {
+            var trailMat = new Material(trailShader);
+            trailMat.SetColor("_BaseColor", Color.white);
+            trail.material = trailMat;
+        }
+
+        // Logic
+        var torpedoScript = root.AddComponent<Torpedo>();
+        torpedoScript.explosionPrefab = explosionPrefab;
+
+        var prefab = SavePrefab(root, path);
+        Object.DestroyImmediate(root);
+        return prefab;
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Main Menu scene
+    // -------------------------------------------------------------------------
+
+    static void BuildMainMenuScene()
+    {
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+        // Directional light
+        var lightGO  = new GameObject("Directional Light");
+        var light    = lightGO.AddComponent<Light>();
+        light.type       = LightType.Directional;
+        light.intensity  = 2f;
+        light.shadows    = LightShadows.Soft;
+        lightGO.transform.rotation = Quaternion.Euler(30f, -30f, 0f);
+
+        // Camera
+        var camGO = new GameObject("Main Camera");
+        camGO.tag = "MainCamera";
+        var cam = camGO.AddComponent<Camera>();
+        cam.clearFlags       = CameraClearFlags.Skybox;
+        cam.fieldOfView      = 60f;
+        camGO.AddComponent<AudioListener>();
+        camGO.transform.position = new Vector3(0f, 5f, -15f);
+        camGO.transform.LookAt(Vector3.zero);
+
+        // Decorative water plane
+        var water = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        water.name = "Water";
+        water.transform.position   = new Vector3(0f, -0.1f, 0f);
+        water.transform.localScale = new Vector3(5f, 1f, 5f);
+        var waterMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/WaterMaterial.mat");
+        if (waterMat != null) water.GetComponent<MeshRenderer>().sharedMaterial = waterMat;
+
+        // CoinManager (persists across scenes via DontDestroyOnLoad)
+        new GameObject("CoinManager").AddComponent<CoinManager>();
+
+        // UI Canvas
+        var canvasGO = new GameObject("Canvas");
+        var canvas   = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        var scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        canvasGO.AddComponent<GraphicRaycaster>();
+
+        // EventSystem with new Input System module
+        CreateEventSystem();
+
+        // Title text
+        var titleGO  = MakeText("Title", canvasGO.transform, "SEA BATTLE", 72, Color.black);
+        var titleRT  = titleGO.GetComponent<RectTransform>();
+        titleRT.anchorMin        = new Vector2(0.5f, 0.7f);
+        titleRT.anchorMax        = new Vector2(0.5f, 0.9f);
+        titleRT.offsetMin        = new Vector2(-400f, 0f);
+        titleRT.offsetMax        = new Vector2(400f, 0f);
+        titleRT.anchoredPosition = Vector2.zero;
+        titleGO.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+        titleGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // Manager GO with MainMenu script
+        var managerGO     = new GameObject("MainMenuManager");
+        var mainMenuScript = managerGO.AddComponent<MainMenu>();
+
+        // Play button
+        var playBtnGO = MakeButton("PlayButton", canvasGO.transform, "PLAY");
+        var playRT    = playBtnGO.GetComponent<RectTransform>();
+        playRT.anchorMin        = new Vector2(0.5f, 0.45f);
+        playRT.anchorMax        = new Vector2(0.5f, 0.55f);
+        playRT.sizeDelta        = new Vector2(300f, 70f);
+        playRT.anchoredPosition = Vector2.zero;
+
+        // Quit button
+        var quitBtnGO = MakeButton("QuitButton", canvasGO.transform, "QUIT");
+        var quitRT    = quitBtnGO.GetComponent<RectTransform>();
+        quitRT.anchorMin        = new Vector2(0.5f, 0.32f);
+        quitRT.anchorMax        = new Vector2(0.5f, 0.42f);
+        quitRT.sizeDelta        = new Vector2(300f, 70f);
+        quitRT.anchoredPosition = Vector2.zero;
+
+        // Wire button callbacks
+        UnityEventTools.AddPersistentListener(
+            playBtnGO.GetComponent<Button>().onClick,
+            mainMenuScript.OnPlayClicked);
+        UnityEventTools.AddPersistentListener(
+            quitBtnGO.GetComponent<Button>().onClick,
+            mainMenuScript.OnQuitClicked);
+
+        // Coin display — top-left
+        var mmCoinGO = MakeText("CoinText", canvasGO.transform, "COINS: 0", 30, Color.yellow);
+        var mmCoinRT = mmCoinGO.GetComponent<RectTransform>();
+        mmCoinRT.anchorMin        = new Vector2(0f, 1f);
+        mmCoinRT.anchorMax        = new Vector2(0f, 1f);
+        mmCoinRT.pivot            = new Vector2(0f, 1f);
+        mmCoinRT.anchoredPosition = new Vector2(20f, -20f);
+        mmCoinRT.sizeDelta        = new Vector2(300f, 50f);
+        mmCoinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
+        mainMenuScript.coinsText = mmCoinGO.GetComponent<Text>();
+
+        EditorSceneManager.SaveScene(scene, "Assets/Scenes/MainMenu.unity");
+        Debug.Log("[ShipButtlr] MainMenu scene saved.");
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Game scene
+    // -------------------------------------------------------------------------
+
+    static void BuildGameScene(
+        System.Collections.Generic.Dictionary<string, Material> mats,
+        GameObject torpedoPrefab)
+    {
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+        // Directional light
+        var lightGO = new GameObject("Directional Light");
+        var light   = lightGO.AddComponent<Light>();
+        light.type      = LightType.Directional;
+        light.intensity = 2f;
+        light.shadows   = LightShadows.Soft;
+        lightGO.transform.rotation = Quaternion.Euler(40f, -30f, 0f);
+
+        // Procedural skybox with sun disk — wire directional light as the sun source
+        string skyboxPath = "Assets/Materials/SkyboxMaterial.mat";
+        var existingSky = AssetDatabase.LoadAssetAtPath<Material>(skyboxPath);
+        if (existingSky != null) AssetDatabase.DeleteAsset(skyboxPath);
+        var skyboxShader = Shader.Find("Skybox/Procedural");
+        if (skyboxShader != null)
+        {
+            var skyboxMat = new Material(skyboxShader);
+            skyboxMat.SetInt(  "_SunDisk",             2);                                  // high-quality sun disk
+            skyboxMat.SetFloat("_SunSize",             0.04f);
+            skyboxMat.SetFloat("_SunSizeConvergence",  5f);
+            skyboxMat.SetFloat("_AtmosphereThickness", 1.0f);
+            skyboxMat.SetColor("_SkyTint",             new Color(0.5f,  0.5f,  0.5f));
+            skyboxMat.SetColor("_GroundColor",         new Color(0.05f, 0.30f, 0.60f));     // ocean blue below horizon
+            skyboxMat.SetFloat("_Exposure",            1.3f);
+            AssetDatabase.CreateAsset(skyboxMat, skyboxPath);
+            RenderSettings.skybox      = skyboxMat;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+            RenderSettings.sun         = light;
+            DynamicGI.UpdateEnvironment();
+        }
+
+        // Sea plane (Plane primitive = 10×10 units; scale 200 = 2000×2000, covers the full horizon)
+        var arena = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        arena.name = "Arena";
+        arena.transform.localScale = new Vector3(200f, 1f, 200f);
+        arena.GetComponent<MeshRenderer>().sharedMaterial = mats["Water"];
+
+        // Decorative islands with trees (visual only — no colliders)
+        CreateIsland(new Vector3( 72f, 0f,  68f), 12f, 3, mats);
+        CreateIsland(new Vector3(-65f, 0f,  75f),  9f, 2, mats);
+        CreateIsland(new Vector3( 58f, 0f, -72f), 10f, 3, mats);
+        CreateIsland(new Vector3(-80f, 0f, -55f),  8f, 2, mats);
+        CreateIsland(new Vector3( 42f, 0f,  82f),  7f, 2, mats);
+        CreateIsland(new Vector3(-45f, 0f, -80f), 11f, 3, mats);
+
+        // Invisible boundary walls (BoxCollider only, tagged "Wall")
+        CreateWall("Wall_PosX", new Vector3(105f,  5f, 0f),   new Vector3(10f, 10f, 210f));
+        CreateWall("Wall_NegX", new Vector3(-105f, 5f, 0f),   new Vector3(10f, 10f, 210f));
+        CreateWall("Wall_PosZ", new Vector3(0f,    5f, 105f), new Vector3(210f, 10f, 10f));
+        CreateWall("Wall_NegZ", new Vector3(0f,    5f, -105f),new Vector3(210f, 10f, 10f));
+
+        // ----- Ships -----
+        // Player at -Z, bot at +Z — both face each other along the Z axis
+        var playerShipGO = BuildShipGO("PlayerShip", new Vector3(0f, 0f, -60f),
+                                       Quaternion.identity, mats["Player"]);
+        playerShipGO.tag = "Player";
+        var playerShip   = playerShipGO.AddComponent<PlayerShip>();
+
+        var botShipGO = BuildShipGO("BotShip", new Vector3(0f, 0f, 60f),
+                                    Quaternion.Euler(0f, 180f, 0f), mats["Bot"]);
+        botShipGO.tag = "Enemy";
+        var botShip   = botShipGO.AddComponent<BotShip>();
+
+        // Assign torpedo prefab and spawn point to both ships
+        Transform playerSpawn = playerShipGO.transform.Find("TorpedoSpawn");
+        playerShip.torpedoPrefab    = torpedoPrefab;
+        playerShip.torpedoSpawnPoint = playerSpawn;
+
+        Transform botSpawn = botShipGO.transform.Find("TorpedoSpawn");
+        botShip.torpedoPrefab    = torpedoPrefab;
+        botShip.torpedoSpawnPoint = botSpawn;
+
+        // ----- Camera -----
+        var camGO = new GameObject("Main Camera");
+        camGO.tag = "MainCamera";
+        camGO.AddComponent<Camera>().clearFlags = CameraClearFlags.Skybox;
+        camGO.AddComponent<AudioListener>();
+        camGO.transform.position = new Vector3(0f, 8f, -75f);  // behind player on Z axis
+        var cameraFollow = camGO.AddComponent<CameraFollow>();
+        cameraFollow.target = playerShipGO.transform;
+
+        // ----- HUD Canvas -----
+        var hudGO    = new GameObject("HUDCanvas");
+        var hudCanvas = hudGO.AddComponent<Canvas>();
+        hudCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        hudCanvas.sortingOrder = 0;
+        var hudScaler = hudGO.AddComponent<CanvasScaler>();
+        hudScaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        hudScaler.referenceResolution = new Vector2(1920f, 1080f);
+        hudGO.AddComponent<GraphicRaycaster>();
+
+        // EventSystem
+        CreateEventSystem();
+
+        // Player HP bar — bottom-left
+        HealthBar playerHealthBar = CreateHPBar(
+            "PlayerHP", hudGO.transform,
+            "YOUR SHIP", Color.green,
+            new Vector2(0f, 0f), new Vector2(0f, 0f),
+            new Vector2(20f, 20f), new Vector2(220f, 50f));
+
+        // Bot HP bar — top-right
+        HealthBar botHealthBar = CreateHPBar(
+            "BotHP", hudGO.transform,
+            "ENEMY SHIP", new Color(1f, 0.3f, 0.3f),
+            new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-240f, -70f), new Vector2(220f, 50f));
+
+        // Wire health bars to ships
+        playerShip.healthBar = playerHealthBar;
+        botShip.healthBar    = botHealthBar;
+
+        // ----- End Panel -----
+        var endPanelGO = BuildEndPanel(hudGO.transform);
+
+        // ----- GameManager -----
+        var gmGO = new GameObject("GameManager");
+        var gm   = gmGO.AddComponent<GameManager>();
+        gm.endPanel      = endPanelGO;
+        gm.cameraFollow  = cameraFollow;
+
+        // Find result text and buttons inside end panel
+        gm.resultText      = endPanelGO.transform.Find("ResultText")?.GetComponent<Text>();
+        var playAgainBtnGO = endPanelGO.transform.Find("PlayAgainButton");
+        var mainMenuBtnGO  = endPanelGO.transform.Find("MainMenuButton");
+
+        if (playAgainBtnGO != null) gm.playAgainButton = playAgainBtnGO.GetComponent<Button>();
+        if (mainMenuBtnGO  != null) gm.mainMenuButton  = mainMenuBtnGO.GetComponent<Button>();
+
+        // Wire end panel buttons
+        if (gm.playAgainButton != null)
+            UnityEventTools.AddPersistentListener(gm.playAgainButton.onClick, gm.PlayAgain);
+        if (gm.mainMenuButton != null)
+            UnityEventTools.AddPersistentListener(gm.mainMenuButton.onClick, gm.LoadMainMenu);
+
+        endPanelGO.SetActive(false);
+
+        // CoinManager (duplicate destroyed by singleton if MainMenu already created one)
+        new GameObject("CoinManager").AddComponent<CoinManager>();
+
+        // Coin display — top-left HUD
+        var coinGO = MakeText("CoinText", hudGO.transform, "COINS: 0", 30, Color.yellow);
+        var coinRT = coinGO.GetComponent<RectTransform>();
+        coinRT.anchorMin        = new Vector2(0f, 1f);
+        coinRT.anchorMax        = new Vector2(0f, 1f);
+        coinRT.pivot            = new Vector2(0f, 1f);
+        coinRT.anchoredPosition = new Vector2(20f, -20f);
+        coinRT.sizeDelta        = new Vector2(300f, 50f);
+        coinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
+        gm.coinsText = coinGO.GetComponent<Text>();
+
+        EditorSceneManager.SaveScene(scene, "Assets/Scenes/GameScene.unity");
+        Debug.Log("[ShipButtlr] GameScene saved.");
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. Build settings
+    // -------------------------------------------------------------------------
+
+    static void ConfigureBuildSettings()
+    {
+        EditorBuildSettings.scenes = new[]
+        {
+            new EditorBuildSettingsScene("Assets/Scenes/MainMenu.unity", true),
+            new EditorBuildSettingsScene("Assets/Scenes/GameScene.unity", true),
+        };
+        Debug.Log("[ShipButtlr] Build Settings updated.");
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    static GameObject SavePrefab(GameObject go, string path)
+    {
+        bool success;
+        var prefab = PrefabUtility.SaveAsPrefabAsset(go, path, out success);
+        if (!success) Debug.LogError("[ShipButtlr] Failed to save prefab at " + path);
+        return prefab;
+    }
+
+    static void CreateWall(string name, Vector3 pos, Vector3 size)
+    {
+        var go  = new GameObject(name);
+        go.tag  = "Wall";
+        go.transform.position = pos;
+        var col = go.AddComponent<BoxCollider>();
+        col.size = size;
+    }
+
+    static void CreateIsland(Vector3 pos, float radius, int treeCount,
+        System.Collections.Generic.Dictionary<string, Material> mats)
+    {
+        var island = new GameObject("Island");
+        island.transform.position = pos;
+        island.tag = "Island";
+        island.AddComponent<IslandData>().radius = radius;
+
+        // Sandy base: flat cylinder. Unity Cylinder default: radius=0.5, height=2 total.
+        // scaleX/Z = radius*2 → desired radius; scaleY=0.15 → 0.3u total height.
+        // Keep the CapsuleCollider so torpedoes physically explode on contact.
+        var baseGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        baseGO.name = "IslandBase";
+        baseGO.transform.SetParent(island.transform);
+        baseGO.transform.localPosition = new Vector3(0f, 0.15f, 0f);
+        baseGO.transform.localScale    = new Vector3(radius * 2f, 0.15f, radius * 2f);
+        baseGO.GetComponent<MeshRenderer>().sharedMaterial = mats["Sand"];
+
+        // Grassy top: slightly smaller cylinder sitting on top of base
+        var topGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        topGO.name = "IslandTop";
+        topGO.transform.SetParent(island.transform);
+        topGO.transform.localPosition = new Vector3(0f, 0.35f, 0f);
+        topGO.transform.localScale    = new Vector3(radius * 1.6f, 0.08f, radius * 1.6f);
+        topGO.GetComponent<MeshRenderer>().sharedMaterial = mats["Grass"];
+        Object.DestroyImmediate(topGO.GetComponent<Collider>());
+
+        // Trees with deterministic seed so layout is stable across repeated BuildAll runs
+        var rng = new System.Random((int)(pos.x * 100 + pos.z));
+        for (int i = 0; i < treeCount; i++)
+        {
+            float angle = (float)(rng.NextDouble() * 360.0);
+            float dist  = (float)(rng.NextDouble() * radius * 0.55f);
+            float tx    = Mathf.Cos(angle * Mathf.Deg2Rad) * dist;
+            float tz    = Mathf.Sin(angle * Mathf.Deg2Rad) * dist;
+            CreateTree(new Vector3(pos.x + tx, 0.43f, pos.z + tz), island, mats);
+        }
+    }
+
+    static void CreateTree(Vector3 pos, GameObject parent,
+        System.Collections.Generic.Dictionary<string, Material> mats)
+    {
+        var tree = new GameObject("Tree");
+        tree.transform.SetParent(parent.transform);
+        tree.transform.position = pos;
+
+        // Trunk: Cylinder. scaleY=0.75 → 1.5u total height; scaleX/Z=0.3 → 0.3u radius.
+        var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        trunk.name = "Trunk";
+        trunk.transform.SetParent(tree.transform);
+        trunk.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+        trunk.transform.localScale    = new Vector3(0.3f, 0.75f, 0.3f);
+        trunk.GetComponent<MeshRenderer>().sharedMaterial = mats["TreeTrunk"];
+        Object.DestroyImmediate(trunk.GetComponent<Collider>());
+
+        // Canopy: Sphere. scale=2.5 → 2.5u diameter; sits just above trunk top.
+        var leaves = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        leaves.name = "Leaves";
+        leaves.transform.SetParent(tree.transform);
+        leaves.transform.localPosition = new Vector3(0f, 2.75f, 0f);
+        leaves.transform.localScale    = new Vector3(2.5f, 2.5f, 2.5f);
+        leaves.GetComponent<MeshRenderer>().sharedMaterial = mats["TreeLeaves"];
+        Object.DestroyImmediate(leaves.GetComponent<Collider>());
+    }
+
+    // Builds a ship root GO with hull, cabin, and torpedo spawn point
+    static GameObject BuildShipGO(string name, Vector3 pos, Quaternion rot, Material mat)
+    {
+        var root = new GameObject(name);
+        root.transform.position = pos;
+        root.transform.rotation = rot;
+
+        // Hull — elongated cube, has the BoxCollider torpedoes will hit
+        var hull = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        hull.name = "Hull";
+        hull.transform.SetParent(root.transform);
+        hull.transform.localPosition = new Vector3(0f, 0.5f, 0f);
+        hull.transform.localScale    = new Vector3(5f, 1f, 12f);
+        hull.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+        // Cabin — elevated rear structure
+        var cabin = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cabin.name = "Cabin";
+        cabin.transform.SetParent(root.transform);
+        cabin.transform.localPosition = new Vector3(0f, 1.5f, 1f);
+        cabin.transform.localScale    = new Vector3(2f, 1.5f, 3f);
+        cabin.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        // Remove cabin collider — only hull needs to detect torpedo hits
+        Object.DestroyImmediate(cabin.GetComponent<BoxCollider>());
+
+        // Torpedo spawn: 1.5 units clear of hull tip (hull half-length = 6), elevated to Y=0.8
+        var spawn = new GameObject("TorpedoSpawn");
+        spawn.transform.SetParent(root.transform);
+        spawn.transform.localPosition = new Vector3(0f, 0.8f, 7.5f);
+
+        return root;
+    }
+
+    // Creates a labelled HP bar and returns its HealthBar component
+    static HealthBar CreateHPBar(
+        string groupName, Transform parent,
+        string label, Color fillColor,
+        Vector2 anchorMin, Vector2 anchorMax,
+        Vector2 anchoredPos, Vector2 size)
+    {
+        // Group container
+        var groupGO = new GameObject(groupName);
+        groupGO.transform.SetParent(parent, false);
+        var groupRT        = groupGO.AddComponent<RectTransform>();
+        groupRT.anchorMin  = anchorMin;
+        groupRT.anchorMax  = anchorMax;
+        groupRT.pivot      = anchorMin;         // pivot matches anchor corner
+        groupRT.anchoredPosition = anchoredPos;
+        groupRT.sizeDelta  = size;
+
+        // Label
+        var labelGO = MakeText("Label", groupGO.transform, label, 18, Color.white);
+        var labelRT = labelGO.GetComponent<RectTransform>();
+        labelRT.anchorMin        = new Vector2(0f, 1f);
+        labelRT.anchorMax        = new Vector2(1f, 1f);
+        labelRT.pivot            = new Vector2(0f, 0f);
+        labelRT.anchoredPosition = new Vector2(0f, 2f);
+        labelRT.sizeDelta        = new Vector2(0f, 22f);
+
+        // Background (dark bar)
+        var bgGO  = new GameObject("Background");
+        bgGO.transform.SetParent(groupGO.transform, false);
+        var bgImg = bgGO.AddComponent<Image>();
+        bgImg.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+        var bgRT   = bgGO.GetComponent<RectTransform>();
+        bgRT.anchorMin        = new Vector2(0f, 0f);
+        bgRT.anchorMax        = new Vector2(1f, 0f);
+        bgRT.pivot            = new Vector2(0f, 0f);
+        bgRT.anchoredPosition = Vector2.zero;
+        bgRT.sizeDelta        = new Vector2(0f, 24f);
+
+        // Fill (coloured progress)
+        var fillGO  = new GameObject("Fill");
+        fillGO.transform.SetParent(bgGO.transform, false);
+        var fillImg = fillGO.AddComponent<Image>();
+        fillImg.color      = fillColor;
+        fillImg.type       = Image.Type.Filled;
+        fillImg.fillMethod = Image.FillMethod.Horizontal;
+        fillImg.fillAmount = 1f;
+        var fillRT = fillGO.GetComponent<RectTransform>();
+        fillRT.anchorMin        = Vector2.zero;
+        fillRT.anchorMax        = Vector2.one;
+        fillRT.offsetMin        = Vector2.zero;
+        fillRT.offsetMax        = Vector2.zero;
+        fillRT.pivot            = new Vector2(0f, 0.5f);
+
+        // HealthBar script lives on the background so it knows which fill to update
+        var hb = bgGO.AddComponent<HealthBar>();
+        hb.fillImage = fillImg;
+
+        return hb;
+    }
+
+    // Builds the full-screen end panel (hidden by default via SetActive(false) after wiring)
+    static GameObject BuildEndPanel(Transform parent)
+    {
+        var panelGO = new GameObject("EndPanel");
+        panelGO.transform.SetParent(parent, false);
+        var panelImg = panelGO.AddComponent<Image>();
+        panelImg.color = new Color(0f, 0f, 0f, 0.75f);
+        var panelRT   = panelGO.GetComponent<RectTransform>();
+        panelRT.anchorMin  = Vector2.zero;
+        panelRT.anchorMax  = Vector2.one;
+        panelRT.offsetMin  = Vector2.zero;
+        panelRT.offsetMax  = Vector2.zero;
+
+        // Result text
+        var resultGO = MakeText("ResultText", panelGO.transform, "VICTORY!", 72, Color.white);
+        var resultRT = resultGO.GetComponent<RectTransform>();
+        resultRT.anchorMin        = new Vector2(0.5f, 0.6f);
+        resultRT.anchorMax        = new Vector2(0.5f, 0.75f);
+        resultRT.offsetMin        = new Vector2(-400f, 0f);
+        resultRT.offsetMax        = new Vector2(400f, 0f);
+        resultRT.anchoredPosition = Vector2.zero;
+        var resultText = resultGO.GetComponent<Text>();
+        resultText.alignment = TextAnchor.MiddleCenter;
+        resultText.fontStyle = FontStyle.Bold;
+
+        // Play Again button
+        var playGO = MakeButton("PlayAgainButton", panelGO.transform, "PLAY AGAIN");
+        var playRT = playGO.GetComponent<RectTransform>();
+        playRT.anchorMin        = new Vector2(0.5f, 0.42f);
+        playRT.anchorMax        = new Vector2(0.5f, 0.52f);
+        playRT.sizeDelta        = new Vector2(320f, 70f);
+        playRT.anchoredPosition = Vector2.zero;
+
+        // Main Menu button
+        var menuGO = MakeButton("MainMenuButton", panelGO.transform, "MAIN MENU");
+        var menuRT = menuGO.GetComponent<RectTransform>();
+        menuRT.anchorMin        = new Vector2(0.5f, 0.30f);
+        menuRT.anchorMax        = new Vector2(0.5f, 0.40f);
+        menuRT.sizeDelta        = new Vector2(320f, 70f);
+        menuRT.anchoredPosition = Vector2.zero;
+
+        return panelGO;
+    }
+
+    // Creates an EventSystem with InputSystemUIInputModule (required for New Input System)
+    static void CreateEventSystem()
+    {
+        // Avoid duplicate EventSystems when called for both Canvas objects in GameScene
+        if (Object.FindFirstObjectByType<EventSystem>() != null) return;
+
+        var esGO = new GameObject("EventSystem");
+        esGO.AddComponent<EventSystem>();
+        esGO.AddComponent<InputSystemUIInputModule>();
+    }
+
+    // Creates a legacy UI.Text GameObject
+    static GameObject MakeText(string name, Transform parent, string content,
+                                int fontSize, Color color)
+    {
+        var go   = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.AddComponent<RectTransform>();
+        var txt  = go.AddComponent<Text>();
+        txt.text      = content;
+        txt.fontSize  = fontSize;
+        txt.color     = color;
+        txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.supportRichText = false;
+        return go;
+    }
+
+    // Creates a Button with a centered text label
+    static GameObject MakeButton(string name, Transform parent, string label)
+    {
+        var go    = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.AddComponent<RectTransform>();
+        var img   = go.AddComponent<Image>();
+        img.color = new Color(0.2f, 0.4f, 0.8f, 1f);
+        var btn   = go.AddComponent<Button>();
+
+        // Hover/press colour tint
+        var colors        = btn.colors;
+        colors.highlightedColor = new Color(0.3f, 0.55f, 1f);
+        colors.pressedColor     = new Color(0.1f, 0.25f, 0.6f);
+        btn.colors = colors;
+
+        var txtGO = MakeText("Text", go.transform, label, 28, Color.white);
+        var txtRT = txtGO.GetComponent<RectTransform>();
+        txtRT.anchorMin  = Vector2.zero;
+        txtRT.anchorMax  = Vector2.one;
+        txtRT.offsetMin  = Vector2.zero;
+        txtRT.offsetMax  = Vector2.zero;
+
+        return go;
+    }
+}
