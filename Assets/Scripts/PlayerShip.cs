@@ -29,6 +29,21 @@ public class PlayerShip : MonoBehaviour
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
         var enemyGO = GameObject.FindWithTag("Enemy");
         if (enemyGO != null) enemy = enemyGO.transform;
+        ApplySelectedShip();
+    }
+
+    void ApplySelectedShip()
+    {
+        string selected = PlayerPrefs.GetString("SelectedShip", "blue");
+        bool yellow = selected == "yellow";
+
+        Color color = yellow ? new Color(1.0f, 0.85f, 0.0f) : new Color(0.30f, 0.40f, 0.70f);
+        moveSpeed   = yellow ? 30f : 15f;
+
+        var hull  = transform.Find("Hull")?.GetComponent<MeshRenderer>();
+        var cabin = transform.Find("Cabin")?.GetComponent<MeshRenderer>();
+        if (hull  != null) hull.material.SetColor("_BaseColor", color);
+        if (cabin != null) cabin.material.SetColor("_BaseColor", color);
     }
 
     void Update()

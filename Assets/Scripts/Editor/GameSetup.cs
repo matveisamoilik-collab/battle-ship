@@ -282,16 +282,24 @@ public static class GameSetup
         // Play button
         var playBtnGO = MakeButton("PlayButton", canvasGO.transform, "PLAY");
         var playRT    = playBtnGO.GetComponent<RectTransform>();
-        playRT.anchorMin        = new Vector2(0.5f, 0.45f);
-        playRT.anchorMax        = new Vector2(0.5f, 0.55f);
+        playRT.anchorMin        = new Vector2(0.5f, 0.48f);
+        playRT.anchorMax        = new Vector2(0.5f, 0.58f);
         playRT.sizeDelta        = new Vector2(300f, 70f);
         playRT.anchoredPosition = Vector2.zero;
+
+        // Shop button
+        var shopBtnGO = MakeButton("ShopButton", canvasGO.transform, "SHOP");
+        var shopBtnRT = shopBtnGO.GetComponent<RectTransform>();
+        shopBtnRT.anchorMin        = new Vector2(0.5f, 0.34f);
+        shopBtnRT.anchorMax        = new Vector2(0.5f, 0.44f);
+        shopBtnRT.sizeDelta        = new Vector2(300f, 70f);
+        shopBtnRT.anchoredPosition = Vector2.zero;
 
         // Quit button
         var quitBtnGO = MakeButton("QuitButton", canvasGO.transform, "QUIT");
         var quitRT    = quitBtnGO.GetComponent<RectTransform>();
-        quitRT.anchorMin        = new Vector2(0.5f, 0.32f);
-        quitRT.anchorMax        = new Vector2(0.5f, 0.42f);
+        quitRT.anchorMin        = new Vector2(0.5f, 0.20f);
+        quitRT.anchorMax        = new Vector2(0.5f, 0.30f);
         quitRT.sizeDelta        = new Vector2(300f, 70f);
         quitRT.anchoredPosition = Vector2.zero;
 
@@ -299,6 +307,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             playBtnGO.GetComponent<Button>().onClick,
             mainMenuScript.OnPlayClicked);
+        UnityEventTools.AddPersistentListener(
+            shopBtnGO.GetComponent<Button>().onClick,
+            mainMenuScript.OnShopClicked);
         UnityEventTools.AddPersistentListener(
             quitBtnGO.GetComponent<Button>().onClick,
             mainMenuScript.OnQuitClicked);
@@ -313,6 +324,10 @@ public static class GameSetup
         mmCoinRT.sizeDelta        = new Vector2(300f, 50f);
         mmCoinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
         mainMenuScript.coinsText = mmCoinGO.GetComponent<Text>();
+
+        // Shop panel — built last so it renders on top; hidden by default
+        var shopPanelGO = BuildShopPanel(canvasGO.transform, mainMenuScript);
+        shopPanelGO.SetActive(false);
 
         EditorSceneManager.SaveScene(scene, "Assets/Scenes/MainMenu.unity");
         Debug.Log("[ShipButtlr] MainMenu scene saved.");
@@ -745,6 +760,245 @@ public static class GameSetup
         txt.alignment = TextAnchor.MiddleCenter;
         txt.supportRichText = false;
         return go;
+    }
+
+    // Builds the full shop overlay panel and wires all callbacks
+    static GameObject BuildShopPanel(Transform canvasTransform, MainMenu script)
+    {
+        // Root panel — modal overlay
+        var shopPanelGO = new GameObject("ShopPanel");
+        shopPanelGO.transform.SetParent(canvasTransform, false);
+        var panelImg = shopPanelGO.AddComponent<Image>();
+        panelImg.color = new Color(0.05f, 0.05f, 0.15f, 0.95f);
+        var panelRT = shopPanelGO.GetComponent<RectTransform>();
+        panelRT.anchorMin = new Vector2(0.1f, 0.1f);
+        panelRT.anchorMax = new Vector2(0.9f, 0.9f);
+        panelRT.offsetMin = Vector2.zero;
+        panelRT.offsetMax = Vector2.zero;
+
+        // Close button — top-right corner
+        var closeBtnGO = MakeButton("CloseButton", shopPanelGO.transform, "X");
+        var closeRT = closeBtnGO.GetComponent<RectTransform>();
+        closeRT.anchorMin        = new Vector2(0.88f, 0.92f);
+        closeRT.anchorMax        = new Vector2(0.98f, 0.99f);
+        closeRT.sizeDelta        = Vector2.zero;
+        closeRT.anchoredPosition = Vector2.zero;
+
+        // Tab buttons — side by side across the top strip
+        var toBuyTabGO = MakeButton("ToBuyTab", shopPanelGO.transform, "TO BUY");
+        var toBuyTabRT = toBuyTabGO.GetComponent<RectTransform>();
+        toBuyTabRT.anchorMin        = new Vector2(0.02f, 0.82f);
+        toBuyTabRT.anchorMax        = new Vector2(0.48f, 0.92f);
+        toBuyTabRT.sizeDelta        = Vector2.zero;
+        toBuyTabRT.anchoredPosition = Vector2.zero;
+
+        var boughtTabGO = MakeButton("BoughtTab", shopPanelGO.transform, "BOUGHT");
+        var boughtTabRT = boughtTabGO.GetComponent<RectTransform>();
+        boughtTabRT.anchorMin        = new Vector2(0.52f, 0.82f);
+        boughtTabRT.anchorMax        = new Vector2(0.98f, 0.92f);
+        boughtTabRT.sizeDelta        = Vector2.zero;
+        boughtTabRT.anchoredPosition = Vector2.zero;
+
+        // ToBuy content panel
+        var toBuyContentGO = new GameObject("ToBuyContent");
+        toBuyContentGO.transform.SetParent(shopPanelGO.transform, false);
+        var toBuyRT = toBuyContentGO.AddComponent<RectTransform>();
+        toBuyRT.anchorMin = new Vector2(0.02f, 0.05f);
+        toBuyRT.anchorMax = new Vector2(0.98f, 0.80f);
+        toBuyRT.offsetMin = Vector2.zero;
+        toBuyRT.offsetMax = Vector2.zero;
+
+        // Yellow ship card (To Buy)
+        var yellowToBuyGO = new GameObject("YellowShipCard");
+        yellowToBuyGO.transform.SetParent(toBuyContentGO.transform, false);
+        var yellowToBuyImg = yellowToBuyGO.AddComponent<Image>();
+        yellowToBuyImg.color = new Color(0.25f, 0.22f, 0.05f, 1f);
+        var yellowToBuyRT = yellowToBuyGO.GetComponent<RectTransform>();
+        yellowToBuyRT.anchorMin = new Vector2(0.02f, 0.55f);
+        yellowToBuyRT.anchorMax = new Vector2(0.38f, 0.98f);
+        yellowToBuyRT.offsetMin = Vector2.zero;
+        yellowToBuyRT.offsetMax = Vector2.zero;
+
+        var ySwatchGO = new GameObject("ColorSwatch");
+        ySwatchGO.transform.SetParent(yellowToBuyGO.transform, false);
+        var ySwatchImg = ySwatchGO.AddComponent<Image>();
+        ySwatchImg.color = new Color(1.0f, 0.85f, 0.0f);
+        var ySwatchRT = ySwatchGO.GetComponent<RectTransform>();
+        ySwatchRT.anchorMin = new Vector2(0.05f, 0.55f);
+        ySwatchRT.anchorMax = new Vector2(0.95f, 0.95f);
+        ySwatchRT.offsetMin = Vector2.zero;
+        ySwatchRT.offsetMax = Vector2.zero;
+
+        var yNameGO = MakeText("ShipNameText", yellowToBuyGO.transform, "YELLOW SHIP", 22, Color.white);
+        var yNameRT = yNameGO.GetComponent<RectTransform>();
+        yNameRT.anchorMin = new Vector2(0f, 0.40f);
+        yNameRT.anchorMax = new Vector2(1f, 0.53f);
+        yNameRT.offsetMin = Vector2.zero;
+        yNameRT.offsetMax = Vector2.zero;
+        yNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var yPriceGO = MakeText("PriceText", yellowToBuyGO.transform, "150 COINS", 20, Color.yellow);
+        var yPriceRT = yPriceGO.GetComponent<RectTransform>();
+        yPriceRT.anchorMin = new Vector2(0f, 0.27f);
+        yPriceRT.anchorMax = new Vector2(1f, 0.40f);
+        yPriceRT.offsetMin = Vector2.zero;
+        yPriceRT.offsetMax = Vector2.zero;
+
+        var buyBtnGO = MakeButton("BuyButton", yellowToBuyGO.transform, "BUY");
+        var buyBtnRT = buyBtnGO.GetComponent<RectTransform>();
+        buyBtnRT.anchorMin        = new Vector2(0.10f, 0.03f);
+        buyBtnRT.anchorMax        = new Vector2(0.90f, 0.24f);
+        buyBtnRT.sizeDelta        = Vector2.zero;
+        buyBtnRT.anchoredPosition = Vector2.zero;
+
+        // Bought content panel — contains the default blue ship card
+        var boughtContentGO = new GameObject("BoughtContent");
+        boughtContentGO.transform.SetParent(shopPanelGO.transform, false);
+        var boughtRT = boughtContentGO.AddComponent<RectTransform>();
+        boughtRT.anchorMin = new Vector2(0.02f, 0.05f);
+        boughtRT.anchorMax = new Vector2(0.98f, 0.80f);
+        boughtRT.offsetMin = Vector2.zero;
+        boughtRT.offsetMax = Vector2.zero;
+
+        // Blue ship card
+        var cardGO = new GameObject("BlueShipCard");
+        cardGO.transform.SetParent(boughtContentGO.transform, false);
+        var cardImg = cardGO.AddComponent<Image>();
+        cardImg.color = new Color(0.15f, 0.20f, 0.35f, 1f);
+        var cardRT = cardGO.GetComponent<RectTransform>();
+        cardRT.anchorMin = new Vector2(0.02f, 0.70f);
+        cardRT.anchorMax = new Vector2(0.38f, 0.98f);
+        cardRT.offsetMin = Vector2.zero;
+        cardRT.offsetMax = Vector2.zero;
+
+        var swatchGO = new GameObject("ColorSwatch");
+        swatchGO.transform.SetParent(cardGO.transform, false);
+        var swatchImg = swatchGO.AddComponent<Image>();
+        swatchImg.color = new Color(0.30f, 0.40f, 0.70f);
+        var swatchRT = swatchGO.GetComponent<RectTransform>();
+        swatchRT.anchorMin = new Vector2(0.05f, 0.45f);
+        swatchRT.anchorMax = new Vector2(0.95f, 0.92f);
+        swatchRT.offsetMin = Vector2.zero;
+        swatchRT.offsetMax = Vector2.zero;
+
+        var nameGO = MakeText("ShipNameText", cardGO.transform, "BLUE SHIP", 22, Color.white);
+        var nameRT = nameGO.GetComponent<RectTransform>();
+        nameRT.anchorMin = new Vector2(0f, 0.30f);
+        nameRT.anchorMax = new Vector2(1f, 0.43f);
+        nameRT.offsetMin = Vector2.zero;
+        nameRT.offsetMax = Vector2.zero;
+        nameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var blueSelectBtnGO = MakeButton("SelectButton", cardGO.transform, "SELECT");
+        var blueSelectBtnRT = blueSelectBtnGO.GetComponent<RectTransform>();
+        blueSelectBtnRT.anchorMin        = new Vector2(0.05f, 0.04f);
+        blueSelectBtnRT.anchorMax        = new Vector2(0.95f, 0.26f);
+        blueSelectBtnRT.sizeDelta        = Vector2.zero;
+        blueSelectBtnRT.anchoredPosition = Vector2.zero;
+
+        var blueSelectedLabelGO = MakeText("SelectedLabel", cardGO.transform, "✓ SELECTED", 20, Color.green);
+        var blueSelectedLabelRT = blueSelectedLabelGO.GetComponent<RectTransform>();
+        blueSelectedLabelRT.anchorMin = new Vector2(0.05f, 0.04f);
+        blueSelectedLabelRT.anchorMax = new Vector2(0.95f, 0.26f);
+        blueSelectedLabelRT.offsetMin = Vector2.zero;
+        blueSelectedLabelRT.offsetMax = Vector2.zero;
+        blueSelectedLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // Yellow ship card (Bought) — initially inactive; RefreshShopUI activates on purchase
+        var yellowBoughtGO = new GameObject("YellowShipBoughtCard");
+        yellowBoughtGO.transform.SetParent(boughtContentGO.transform, false);
+        var yellowBoughtImg = yellowBoughtGO.AddComponent<Image>();
+        yellowBoughtImg.color = new Color(0.25f, 0.22f, 0.05f, 1f);
+        var yellowBoughtRT = yellowBoughtGO.GetComponent<RectTransform>();
+        yellowBoughtRT.anchorMin = new Vector2(0.42f, 0.70f);
+        yellowBoughtRT.anchorMax = new Vector2(0.78f, 0.98f);
+        yellowBoughtRT.offsetMin = Vector2.zero;
+        yellowBoughtRT.offsetMax = Vector2.zero;
+
+        var ybSwatchGO = new GameObject("ColorSwatch");
+        ybSwatchGO.transform.SetParent(yellowBoughtGO.transform, false);
+        var ybSwatchImg = ybSwatchGO.AddComponent<Image>();
+        ybSwatchImg.color = new Color(1.0f, 0.85f, 0.0f);
+        var ybSwatchRT = ybSwatchGO.GetComponent<RectTransform>();
+        ybSwatchRT.anchorMin = new Vector2(0.05f, 0.45f);
+        ybSwatchRT.anchorMax = new Vector2(0.95f, 0.92f);
+        ybSwatchRT.offsetMin = Vector2.zero;
+        ybSwatchRT.offsetMax = Vector2.zero;
+
+        var ybNameGO = MakeText("ShipNameText", yellowBoughtGO.transform, "YELLOW SHIP", 22, Color.white);
+        var ybNameRT = ybNameGO.GetComponent<RectTransform>();
+        ybNameRT.anchorMin = new Vector2(0f, 0.30f);
+        ybNameRT.anchorMax = new Vector2(1f, 0.43f);
+        ybNameRT.offsetMin = Vector2.zero;
+        ybNameRT.offsetMax = Vector2.zero;
+        ybNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var yellowSelectBtnGO = MakeButton("SelectButton", yellowBoughtGO.transform, "SELECT");
+        var yellowSelectBtnRT = yellowSelectBtnGO.GetComponent<RectTransform>();
+        yellowSelectBtnRT.anchorMin        = new Vector2(0.05f, 0.04f);
+        yellowSelectBtnRT.anchorMax        = new Vector2(0.52f, 0.26f);
+        yellowSelectBtnRT.sizeDelta        = Vector2.zero;
+        yellowSelectBtnRT.anchoredPosition = Vector2.zero;
+
+        var sellBtnGO = MakeButton("SellButton", yellowBoughtGO.transform, "SELL");
+        var sellBtnRT = sellBtnGO.GetComponent<RectTransform>();
+        sellBtnRT.anchorMin        = new Vector2(0.55f, 0.04f);
+        sellBtnRT.anchorMax        = new Vector2(0.95f, 0.26f);
+        sellBtnRT.sizeDelta        = Vector2.zero;
+        sellBtnRT.anchoredPosition = Vector2.zero;
+        sellBtnGO.GetComponent<Image>().color = new Color(0.65f, 0.12f, 0.12f);
+
+        var yellowSelectedLabelGO = MakeText("SelectedLabel", yellowBoughtGO.transform, "✓ SELECTED", 20, Color.green);
+        var yellowSelectedLabelRT = yellowSelectedLabelGO.GetComponent<RectTransform>();
+        yellowSelectedLabelRT.anchorMin = new Vector2(0.05f, 0.04f);
+        yellowSelectedLabelRT.anchorMax = new Vector2(0.95f, 0.26f);
+        yellowSelectedLabelRT.offsetMin = Vector2.zero;
+        yellowSelectedLabelRT.offsetMax = Vector2.zero;
+        yellowSelectedLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        yellowBoughtGO.SetActive(false);
+
+        // Assign MainMenu fields
+        script.shopPanel              = shopPanelGO;
+        script.toBuyContent           = toBuyContentGO;
+        script.boughtContent          = boughtContentGO;
+        script.yellowShipToBuyCard    = yellowToBuyGO;
+        script.yellowShipBoughtCard   = yellowBoughtGO;
+        script.buyYellowShipButton    = buyBtnGO.GetComponent<Button>();
+        script.blueShipSelectButton   = blueSelectBtnGO.GetComponent<Button>();
+        script.blueShipSelectedLabel  = blueSelectedLabelGO.GetComponent<Text>();
+        script.yellowShipSelectButton  = yellowSelectBtnGO.GetComponent<Button>();
+        script.yellowShipSelectedLabel = yellowSelectedLabelGO.GetComponent<Text>();
+        script.yellowShipSellButton    = sellBtnGO.GetComponent<Button>();
+
+        // Wire callbacks
+        UnityEventTools.AddPersistentListener(
+            closeBtnGO.GetComponent<Button>().onClick,
+            script.OnCloseShopClicked);
+        UnityEventTools.AddPersistentListener(
+            toBuyTabGO.GetComponent<Button>().onClick,
+            script.ShowToBuyTab);
+        UnityEventTools.AddPersistentListener(
+            boughtTabGO.GetComponent<Button>().onClick,
+            script.ShowBoughtTab);
+        UnityEventTools.AddPersistentListener(
+            buyBtnGO.GetComponent<Button>().onClick,
+            script.OnBuyYellowShipClicked);
+        UnityEventTools.AddPersistentListener(
+            blueSelectBtnGO.GetComponent<Button>().onClick,
+            script.OnSelectBlueShip);
+        UnityEventTools.AddPersistentListener(
+            yellowSelectBtnGO.GetComponent<Button>().onClick,
+            script.OnSelectYellowShip);
+        UnityEventTools.AddPersistentListener(
+            sellBtnGO.GetComponent<Button>().onClick,
+            script.OnSellYellowShipClicked);
+
+        // Bought tab visible by default
+        toBuyContentGO.SetActive(false);
+        boughtContentGO.SetActive(true);
+
+        return shopPanelGO;
     }
 
     // Creates a Button with a centered text label

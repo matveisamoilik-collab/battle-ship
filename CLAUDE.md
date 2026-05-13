@@ -8,6 +8,13 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 
 **Coin economy:** Win awards +20 coins, losing awards +1 consolation coin. Stored in `PlayerPrefs` under key `"Coins"` via `CoinManager`.
 
+**PlayerPrefs keys** (all persistence is via PlayerPrefs — no save files):
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `"Coins"` | int | 0 | Coin balance (managed by `CoinManager`) |
+| `"YellowShipOwned"` | int | 0 | 1 = yellow ship purchased |
+| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"` or `"yellow"` |
+
 ## Development Workflow
 
 - Open the project in Unity 6 Editor to build, run, and test
@@ -16,11 +23,17 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 - Unity Test Framework (com.unity.test-framework 1.6.0) is available for writing Play Mode and Edit Mode tests via the Unity Test Runner window
 - **Rebuild scenes from scratch**: run `ShipButtlr > Build All` from the Unity menu bar — this executes `Assets/Scripts/Editor/GameSetup.cs`, which programmatically creates all materials, prefabs, and both scenes. Script-only changes (no scene/material changes) are picked up by Unity automatically without a rebuild.
 
+## Player Controls
+
+- **Move**: WASD or arrow keys (forward/back/turn)
+- **Fire**: Space or left mouse button — 2 s cooldown between shots
+
 ## Architecture
 
 ### Tech Stack
 - **Engine:** Unity 6000.3.7f1 with Universal Render Pipeline (URP) 17.3.0
 - **Input:** Unity New Input System 1.18.0 — existing gameplay scripts poll `Keyboard.current` / `Mouse.current` directly rather than using the generated `InputSystem_Actions` class
+- **UI:** Legacy `UnityEngine.UI` (`Text`, `Image`, `Button`) — not TextMeshPro. `GameSetup` uses `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")`. Canvas mode: `ScreenSpaceOverlay`, `ScaleWithScreenSize` at 1920×1080.
 - **Scripting:** C# targeting .NET Standard 2.1
 
 ### Key Directories
@@ -34,10 +47,30 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 ### Scene Flow
 `MainMenu` → `GameScene` (play) → `MainMenu` (main menu button) or reload `GameScene` (play again). Scene names passed to `SceneManager.LoadScene` must match exactly: `"MainMenu"` and `"GameScene"`.
 
+### Shop System
+
+The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `BuildShopPanel()` inside `GameSetup.cs`. All shop state is driven by `MainMenu.RefreshShopUI()` — this is the single method that reads PlayerPrefs and sets `SetActive` / `interactable` on every shop widget. Call it whenever state might have changed (on open, after buy, after sell, after select).
+
+**Two tabs** (content panels toggled via `ShowToBuyTab()` / `ShowBoughtTab()`):
+- **To Buy** — shows ship cards for purchasable unowned ships. Each card has: color swatch, name, price text, BUY button (disabled when coins insufficient or already owned).
+- **Bought** — shows all owned ships. Blue ship is always present. Each purchasable ship's card has: SELECT button + SELL button (both hidden when that ship is selected; replaced by "✓ SELECTED" label). Selling is blocked on the currently selected ship.
+
+**Ship card pattern in Bought tab** (both blue and yellow cards share this layout):
+- ColorSwatch: `anchorMin=(0.05, 0.45)`, `anchorMax=(0.95, 0.92)`
+- ShipNameText: `anchorMin=(0, 0.30)`, `anchorMax=(1, 0.43)`
+- Bottom strip (0.04–0.26): SELECT button (left half, 0.05–0.52) + SELL button (right half, 0.55–0.95, red tint), OR "✓ SELECTED" label (full width) when selected
+
+**Adding a new purchasable ship:** add its card to ToBuyContent and BoughtContent in `BuildShopPanel()`, add corresponding `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` key for ownership, add a new `"SelectedShip"` string value, and extend `RefreshShopUI()` and `ApplySelectedShip()` (in `PlayerShip.cs`) to handle the new variant.
+
+**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()`. It reads `"SelectedShip"` from PlayerPrefs and sets both the color (`hull.material.SetColor("_BaseColor", …)` — uses `.material` instance, not `.sharedMaterial`) and `moveSpeed` on the PlayerShip component.
+
 ### Core Script Relationships
 
 ```
-GameManager (singleton, IsGameOver)
+CoinManager (DontDestroyOnLoad singleton — spawned in MainMenu, survives to GameScene;
+             duplicate in GameScene is silently destroyed by Awake singleton check)
+
+GameManager (non-persistent singleton, IsGameOver)
   ├── PlayerShip  → TakeDamage() → GameManager.PlayerDefeated()
   │               → PushOutOfIslands() / PushOutOfShip() — code-based collision
   │               → TryShake() → GameManager.ShakeCamera()
@@ -45,8 +78,8 @@ GameManager (singleton, IsGameOver)
   │               → PushOutOfIslands() / PushOutOfShip() — code-based collision
   ├── Torpedo     → routes damage via isPlayerTorpedo flag + root tag lookup
   ├── HealthBar   → driven by SetHealth(current, max) calls from ships
+  │               → scales fill RectTransform localScale.x (not fillAmount); pivot (0, 0.5)
   ├── IslandData  → data component on each island root; stores radius for collision
-  ├── HealthBar   → scales fill RectTransform localScale.x (not fillAmount); pivot set to (0, 0.5)
   └── CameraFollow → Shake() coroutine (unscaledDeltaTime); shakeOffset applied
                      directly to transform.position AFTER the lerp (not inside it)
 ```
@@ -58,7 +91,24 @@ GameManager (singleton, IsGameOver)
 - `FLANK` → orbits player at ~40-unit radius; transitions back to `APPROACH` when distance > 55
 - `RETREAT` → moves directly away for 3 seconds when HP < 30%; then returns to `APPROACH`
 
+Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. It aims at the player's position at the moment of firing — no leading/prediction.
+
 **Torpedo** collision uses `collision.transform.root` to reach the ship script, since ships are multi-object hierarchies (root → Hull, Cabin, TorpedoSpawn). Tags used: `"Player"`, `"Enemy"`, `"Wall"`, `"Island"`. Collisions against friendly ships are silently ignored. Self-collision on spawn is prevented by a 0.1 s `Invoke` delay. Torpedoes explode on island base colliders (islands are tagged `"Island"`).
+
+### Game Balance Values
+| Stat | Value |
+|---|---|
+| Ship HP (both) | 245 |
+| Torpedo damage | 35 (7 hits to kill) |
+| Torpedo speed | 50 units/s |
+| Torpedo lifetime | 5 s |
+| Player fire cooldown | 2 s |
+| Bot fire interval | 1.6–2.4 s random |
+| Player move speed — blue ship | 15 units/s |
+| Player move speed — yellow ship | 30 units/s (2× blue) |
+| Bot move speed | 10 units/s |
+| Yellow ship cost | 150 coins |
+| Yellow ship sell price | 75 coins (half price) |
 
 ### Arena & Environment
 - **Sea plane**: 2000×2000 units (scale 200), covers the full visible horizon
