@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo battle between a player-controlled ship and a bot. It is a native Unity project — there are no npm/yarn scripts, Makefiles, or CLI build commands. All building, running, and testing is done through the Unity Editor.
 
-**Coin economy:** Win awards +20 coins, losing awards +1 consolation coin. Stored in `PlayerPrefs` under key `"Coins"` via `CoinManager`.
+**Coin economy:** Win awards +20 coins, losing awards +1 consolation coin. Stored in `PlayerPrefs` under key `"Coins"` via `CoinManager`. `CoinManager.AddCoins(amount)` accepts negative values (used for purchases).
 
 **PlayerPrefs keys** (all persistence is via PlayerPrefs — no save files):
 | Key | Type | Default | Meaning |
@@ -14,6 +14,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"Coins"` | int | 0 | Coin balance (managed by `CoinManager`) |
 | `"YellowShipOwned"` | int | 0 | 1 = yellow ship purchased |
 | `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"` or `"yellow"` |
+| `"Promo_pizza1"` … `"Promo_pizza8"` | int | 0 | 1 = promo code already redeemed |
 
 ## Development Workflow
 
@@ -33,7 +34,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 ### Tech Stack
 - **Engine:** Unity 6000.3.7f1 with Universal Render Pipeline (URP) 17.3.0
 - **Input:** Unity New Input System 1.18.0 — existing gameplay scripts poll `Keyboard.current` / `Mouse.current` directly rather than using the generated `InputSystem_Actions` class
-- **UI:** Legacy `UnityEngine.UI` (`Text`, `Image`, `Button`) — not TextMeshPro. `GameSetup` uses `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")`. Canvas mode: `ScreenSpaceOverlay`, `ScaleWithScreenSize` at 1920×1080.
+- **UI:** Legacy `UnityEngine.UI` (`Text`, `Image`, `Button`, `InputField`) — not TextMeshPro. `GameSetup` uses `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")`. Canvas mode: `ScreenSpaceOverlay`, `ScaleWithScreenSize` at 1920×1080.
 - **Scripting:** C# targeting .NET Standard 2.1
 
 ### Key Directories
@@ -49,11 +50,13 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 
 ### Shop System
 
-The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `BuildShopPanel()` inside `GameSetup.cs`. All shop state is driven by `MainMenu.RefreshShopUI()` — this is the single method that reads PlayerPrefs and sets `SetActive` / `interactable` on every shop widget. Call it whenever state might have changed (on open, after buy, after sell, after select).
+The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `BuildShopPanel()` inside `GameSetup.cs`. All shop state is driven by `MainMenu.RefreshShopUI()` — this is the single method that reads PlayerPrefs and sets `SetActive` / `interactable` on every shop widget. Call it whenever state might have changed (on open, after buy, after sell, after select, after promo redemption).
 
 **Two tabs** (content panels toggled via `ShowToBuyTab()` / `ShowBoughtTab()`):
-- **To Buy** — shows ship cards for purchasable unowned ships. Each card has: color swatch, name, price text, BUY button (disabled when coins insufficient or already owned).
+- **To Buy** — shows ship cards for purchasable unowned ships (top area), plus a **Promo Code section** at the bottom (anchors 0.02–0.98 × 0.02–0.50 within ToBuyContent). The promo section has a label, a legacy `InputField`, a REDEEM button, and a feedback `Text`.
 - **Bought** — shows all owned ships. Blue ship is always present. Each purchasable ship's card has: SELECT button + SELL button (both hidden when that ship is selected; replaced by "✓ SELECTED" label). Selling is blocked on the currently selected ship.
+
+**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are `pizza1`–`pizza8`, each grants +5 coins once. Used codes are tracked per-code in PlayerPrefs (`"Promo_<code>"`). Feedback text turns green on success, orange for already-used, red for invalid.
 
 **Ship card pattern in Bought tab** (both blue and yellow cards share this layout):
 - ColorSwatch: `anchorMin=(0.05, 0.45)`, `anchorMax=(0.95, 0.92)`
@@ -109,6 +112,7 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. It aims at t
 | Bot move speed | 10 units/s |
 | Yellow ship cost | 150 coins |
 | Yellow ship sell price | 75 coins (half price) |
+| Promo code reward | 5 coins |
 
 ### Arena & Environment
 - **Sea plane**: 2000×2000 units (scale 200), covers the full visible horizon

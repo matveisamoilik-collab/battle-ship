@@ -851,6 +851,70 @@ public static class GameSetup
         buyBtnRT.sizeDelta        = Vector2.zero;
         buyBtnRT.anchoredPosition = Vector2.zero;
 
+        // Promo code section — bottom strip of ToBuyContent
+        var promoSectionGO = new GameObject("PromoSection");
+        promoSectionGO.transform.SetParent(toBuyContentGO.transform, false);
+        var promoSectionImg = promoSectionGO.AddComponent<Image>();
+        promoSectionImg.color = new Color(0.08f, 0.08f, 0.18f, 0.85f);
+        var promoSectionRT = promoSectionGO.GetComponent<RectTransform>();
+        promoSectionRT.anchorMin = new Vector2(0.02f, 0.02f);
+        promoSectionRT.anchorMax = new Vector2(0.98f, 0.50f);
+        promoSectionRT.offsetMin = Vector2.zero;
+        promoSectionRT.offsetMax = Vector2.zero;
+
+        var promoLabelGO = MakeText("PromoLabel", promoSectionGO.transform, "PROMO CODE", 22, Color.white);
+        var promoLabelRT = promoLabelGO.GetComponent<RectTransform>();
+        promoLabelRT.anchorMin = new Vector2(0.02f, 0.78f);
+        promoLabelRT.anchorMax = new Vector2(0.98f, 1.00f);
+        promoLabelRT.offsetMin = Vector2.zero;
+        promoLabelRT.offsetMax = Vector2.zero;
+        promoLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // InputField (legacy UI)
+        var promoInputGO = new GameObject("PromoInputField");
+        promoInputGO.transform.SetParent(promoSectionGO.transform, false);
+        var promoInputImg = promoInputGO.AddComponent<Image>();
+        promoInputImg.color = new Color(0.04f, 0.04f, 0.12f, 1f);
+        var promoInputRT = promoInputGO.GetComponent<RectTransform>();
+        promoInputRT.anchorMin        = new Vector2(0.02f, 0.46f);
+        promoInputRT.anchorMax        = new Vector2(0.72f, 0.74f);
+        promoInputRT.offsetMin        = Vector2.zero;
+        promoInputRT.offsetMax        = Vector2.zero;
+        var promoInputField = promoInputGO.AddComponent<InputField>();
+
+        var promoPlaceholderGO = MakeText("Placeholder", promoInputGO.transform, "Enter code...", 20,
+                                          new Color(0.5f, 0.5f, 0.5f, 0.7f));
+        promoPlaceholderGO.GetComponent<Text>().fontStyle = FontStyle.Italic;
+        var promoPlaceholderRT = promoPlaceholderGO.GetComponent<RectTransform>();
+        promoPlaceholderRT.anchorMin = Vector2.zero;
+        promoPlaceholderRT.anchorMax = Vector2.one;
+        promoPlaceholderRT.offsetMin = new Vector2(5f, 0f);
+        promoPlaceholderRT.offsetMax = new Vector2(-5f, 0f);
+
+        var promoInputTextGO = MakeText("Text", promoInputGO.transform, "", 20, Color.white);
+        var promoInputTextRT = promoInputTextGO.GetComponent<RectTransform>();
+        promoInputTextRT.anchorMin = Vector2.zero;
+        promoInputTextRT.anchorMax = Vector2.one;
+        promoInputTextRT.offsetMin = new Vector2(5f, 0f);
+        promoInputTextRT.offsetMax = new Vector2(-5f, 0f);
+
+        promoInputField.textComponent = promoInputTextGO.GetComponent<Text>();
+        promoInputField.placeholder   = promoPlaceholderGO.GetComponent<Graphic>();
+
+        var redeemBtnGO = MakeButton("RedeemButton", promoSectionGO.transform, "REDEEM");
+        var redeemBtnRT = redeemBtnGO.GetComponent<RectTransform>();
+        redeemBtnRT.anchorMin        = new Vector2(0.74f, 0.46f);
+        redeemBtnRT.anchorMax        = new Vector2(0.98f, 0.74f);
+        redeemBtnRT.sizeDelta        = Vector2.zero;
+        redeemBtnRT.anchoredPosition = Vector2.zero;
+
+        var promoFeedbackGO = MakeText("PromoFeedback", promoSectionGO.transform, "", 20, Color.white);
+        var promoFeedbackRT = promoFeedbackGO.GetComponent<RectTransform>();
+        promoFeedbackRT.anchorMin = new Vector2(0.02f, 0.08f);
+        promoFeedbackRT.anchorMax = new Vector2(0.98f, 0.43f);
+        promoFeedbackRT.offsetMin = Vector2.zero;
+        promoFeedbackRT.offsetMax = Vector2.zero;
+
         // Bought content panel — contains the default blue ship card
         var boughtContentGO = new GameObject("BoughtContent");
         boughtContentGO.transform.SetParent(shopPanelGO.transform, false);
@@ -970,6 +1034,8 @@ public static class GameSetup
         script.yellowShipSelectButton  = yellowSelectBtnGO.GetComponent<Button>();
         script.yellowShipSelectedLabel = yellowSelectedLabelGO.GetComponent<Text>();
         script.yellowShipSellButton    = sellBtnGO.GetComponent<Button>();
+        script.promoCodeInput          = promoInputField;
+        script.promoFeedbackText       = promoFeedbackGO.GetComponent<Text>();
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(
@@ -993,6 +1059,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             sellBtnGO.GetComponent<Button>().onClick,
             script.OnSellYellowShipClicked);
+        UnityEventTools.AddPersistentListener(
+            redeemBtnGO.GetComponent<Button>().onClick,
+            script.OnRedeemPromoCode);
 
         // Bought tab visible by default
         toBuyContentGO.SetActive(false);

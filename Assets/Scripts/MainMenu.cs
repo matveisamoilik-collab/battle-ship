@@ -20,6 +20,9 @@ public class MainMenu : MonoBehaviour
     public Text   yellowShipSelectedLabel;
     public Button yellowShipSellButton;
 
+    public InputField promoCodeInput;
+    public Text       promoFeedbackText;
+
     void Start()
     {
         RefreshShopUI();
@@ -63,7 +66,7 @@ public class MainMenu : MonoBehaviour
         if (boughtContent != null) boughtContent.SetActive(true);
     }
 
-    void RefreshShopUI()
+    public void RefreshShopUI()
     {
         bool yellowOwned = PlayerPrefs.GetInt("YellowShipOwned", 0) == 1;
 
@@ -126,5 +129,37 @@ public class MainMenu : MonoBehaviour
 
         RefreshShopUI();
         ShowBoughtTab();
+    }
+
+    public void OnRedeemPromoCode()
+    {
+        if (promoCodeInput == null || promoFeedbackText == null) return;
+
+        string code = promoCodeInput.text.Trim().ToLower();
+        var validCodes = new[] { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8" };
+
+        bool isValid = System.Array.IndexOf(validCodes, code) >= 0;
+        if (!isValid)
+        {
+            promoFeedbackText.color = Color.red;
+            promoFeedbackText.text  = "Invalid code.";
+            return;
+        }
+
+        string prefsKey = "Promo_" + code;
+        if (PlayerPrefs.GetInt(prefsKey, 0) == 1)
+        {
+            promoFeedbackText.color = new Color(1f, 0.6f, 0f);
+            promoFeedbackText.text  = "Already used.";
+            return;
+        }
+
+        CoinManager.Instance?.AddCoins(5);
+        PlayerPrefs.SetInt(prefsKey, 1);
+        PlayerPrefs.Save();
+        promoCodeInput.text     = "";
+        promoFeedbackText.color = Color.green;
+        promoFeedbackText.text  = "+5 COINS!";
+        RefreshShopUI();
     }
 }
