@@ -1022,6 +1022,63 @@ public static class GameSetup
 
         yellowBoughtGO.SetActive(false);
 
+        // Yellow-Red ship card (Bought tab only — unlocked via pizza1 promo)
+        var yrBoughtGO = new GameObject("YellowRedShipBoughtCard");
+        yrBoughtGO.transform.SetParent(boughtContentGO.transform, false);
+        var yrBoughtImg = yrBoughtGO.AddComponent<Image>();
+        yrBoughtImg.color = new Color(0.20f, 0.05f, 0.05f, 1f);
+        var yrBoughtRT = yrBoughtGO.GetComponent<RectTransform>();
+        yrBoughtRT.anchorMin = new Vector2(0.02f, 0.38f);
+        yrBoughtRT.anchorMax = new Vector2(0.38f, 0.66f);
+        yrBoughtRT.offsetMin = yrBoughtRT.offsetMax = Vector2.zero;
+
+        var yrSwatchGO = new GameObject("ColorSwatch");
+        yrSwatchGO.transform.SetParent(yrBoughtGO.transform, false);
+        yrSwatchGO.AddComponent<Image>().color = Color.clear;
+        var yrSwatchRT = yrSwatchGO.GetComponent<RectTransform>();
+        yrSwatchRT.anchorMin = new Vector2(0.05f, 0.45f);
+        yrSwatchRT.anchorMax = new Vector2(0.95f, 0.92f);
+        yrSwatchRT.offsetMin = yrSwatchRT.offsetMax = Vector2.zero;
+
+        var yrBottomGO = new GameObject("SwatchBottom");
+        yrBottomGO.transform.SetParent(yrSwatchGO.transform, false);
+        yrBottomGO.AddComponent<Image>().color = new Color(1.0f, 0.85f, 0.0f);
+        var yrBottomRT = yrBottomGO.GetComponent<RectTransform>();
+        yrBottomRT.anchorMin = Vector2.zero;
+        yrBottomRT.anchorMax = new Vector2(1f, 0.5f);
+        yrBottomRT.offsetMin = yrBottomRT.offsetMax = Vector2.zero;
+
+        var yrTopGO = new GameObject("SwatchTop");
+        yrTopGO.transform.SetParent(yrSwatchGO.transform, false);
+        yrTopGO.AddComponent<Image>().color = new Color(0.85f, 0.10f, 0.10f);
+        var yrTopRT = yrTopGO.GetComponent<RectTransform>();
+        yrTopRT.anchorMin = new Vector2(0f, 0.5f);
+        yrTopRT.anchorMax = Vector2.one;
+        yrTopRT.offsetMin = yrTopRT.offsetMax = Vector2.zero;
+
+        var yrNameGO = MakeText("ShipNameText", yrBoughtGO.transform, "YELLOW-RED SHIP", 20, Color.white);
+        var yrNameRT = yrNameGO.GetComponent<RectTransform>();
+        yrNameRT.anchorMin = new Vector2(0f, 0.30f);
+        yrNameRT.anchorMax = new Vector2(1f, 0.43f);
+        yrNameRT.offsetMin = yrNameRT.offsetMax = Vector2.zero;
+        yrNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var yrSelectBtnGO = MakeButton("SelectButton", yrBoughtGO.transform, "SELECT");
+        var yrSelectBtnRT = yrSelectBtnGO.GetComponent<RectTransform>();
+        yrSelectBtnRT.anchorMin        = new Vector2(0.05f, 0.04f);
+        yrSelectBtnRT.anchorMax        = new Vector2(0.95f, 0.26f);
+        yrSelectBtnRT.sizeDelta        = Vector2.zero;
+        yrSelectBtnRT.anchoredPosition = Vector2.zero;
+
+        var yrSelectedLabelGO = MakeText("SelectedLabel", yrBoughtGO.transform, "✓ SELECTED", 20, Color.green);
+        var yrSelectedLabelRT = yrSelectedLabelGO.GetComponent<RectTransform>();
+        yrSelectedLabelRT.anchorMin = new Vector2(0.05f, 0.04f);
+        yrSelectedLabelRT.anchorMax = new Vector2(0.95f, 0.26f);
+        yrSelectedLabelRT.offsetMin = yrSelectedLabelRT.offsetMax = Vector2.zero;
+        yrSelectedLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        yrBoughtGO.SetActive(false);
+
         // Assign MainMenu fields
         script.shopPanel              = shopPanelGO;
         script.toBuyContent           = toBuyContentGO;
@@ -1033,9 +1090,12 @@ public static class GameSetup
         script.blueShipSelectedLabel  = blueSelectedLabelGO.GetComponent<Text>();
         script.yellowShipSelectButton  = yellowSelectBtnGO.GetComponent<Button>();
         script.yellowShipSelectedLabel = yellowSelectedLabelGO.GetComponent<Text>();
-        script.yellowShipSellButton    = sellBtnGO.GetComponent<Button>();
-        script.promoCodeInput          = promoInputField;
-        script.promoFeedbackText       = promoFeedbackGO.GetComponent<Text>();
+        script.yellowShipSellButton       = sellBtnGO.GetComponent<Button>();
+        script.yellowRedShipBoughtCard    = yrBoughtGO;
+        script.yellowRedShipSelectButton  = yrSelectBtnGO.GetComponent<Button>();
+        script.yellowRedShipSelectedLabel = yrSelectedLabelGO.GetComponent<Text>();
+        script.promoCodeInput             = promoInputField;
+        script.promoFeedbackText          = promoFeedbackGO.GetComponent<Text>();
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(
@@ -1059,6 +1119,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             sellBtnGO.GetComponent<Button>().onClick,
             script.OnSellYellowShipClicked);
+        UnityEventTools.AddPersistentListener(
+            yrSelectBtnGO.GetComponent<Button>().onClick,
+            script.OnSelectYellowRedShip);
         UnityEventTools.AddPersistentListener(
             redeemBtnGO.GetComponent<Button>().onClick,
             script.OnRedeemPromoCode);

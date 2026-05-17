@@ -13,7 +13,8 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 |---|---|---|---|
 | `"Coins"` | int | 0 | Coin balance (managed by `CoinManager`) |
 | `"YellowShipOwned"` | int | 0 | 1 = yellow ship purchased |
-| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"` or `"yellow"` |
+| `"YellowRedShipOwned"` | int | 0 | 1 = yellow-red ship unlocked via `pizza1` |
+| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, or `"yellowred"` |
 | `"Promo_pizza1"` … `"Promo_pizza8"` | int | 0 | 1 = promo code already redeemed |
 
 ## Development Workflow
@@ -56,16 +57,21 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 - **To Buy** — shows ship cards for purchasable unowned ships (top area), plus a **Promo Code section** at the bottom (anchors 0.02–0.98 × 0.02–0.50 within ToBuyContent). The promo section has a label, a legacy `InputField`, a REDEEM button, and a feedback `Text`.
 - **Bought** — shows all owned ships. Blue ship is always present. Each purchasable ship's card has: SELECT button + SELL button (both hidden when that ship is selected; replaced by "✓ SELECTED" label). Selling is blocked on the currently selected ship.
 
-**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are `pizza1`–`pizza8`, each grants +5 coins once. Used codes are tracked per-code in PlayerPrefs (`"Promo_<code>"`). Feedback text turns green on success, orange for already-used, red for invalid.
+**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are defined in the static array `MainMenu.s_validPromoCodes` (`pizza1`–`pizza8`). Each grants +5 coins once; used codes are tracked in PlayerPrefs (`"Promo_<code>"`). Feedback: green on success, orange for already-used, red for invalid.
 
-**Ship card pattern in Bought tab** (both blue and yellow cards share this layout):
-- ColorSwatch: `anchorMin=(0.05, 0.45)`, `anchorMax=(0.95, 0.92)`
-- ShipNameText: `anchorMin=(0, 0.30)`, `anchorMax=(1, 0.43)`
-- Bottom strip (0.04–0.26): SELECT button (left half, 0.05–0.52) + SELL button (right half, 0.55–0.95, red tint), OR "✓ SELECTED" label (full width) when selected
+- **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
+- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts `PromoCodeReward` coins and clears the PlayerPrefs flag for each redeemed code, then if `pizza1` was reset also clears `"YellowRedShipOwned"` and reverts `"SelectedShip"` to `"blue"` if needed. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
+- **Future-proofing**: add new codes to `s_validPromoCodes` and `resett` covers them automatically. If a new code unlocks a ship, add the ship-revocation logic to the `pizza1WasReset`-style check in the `resett` block.
+
+**Ship card pattern in Bought tab:**
+- Standard (purchasable) ships — blue, yellow: ColorSwatch `(0.05,0.45)–(0.95,0.92)`, ShipNameText `(0,0.30)–(1,0.43)`, bottom strip `(0.04–0.26)`: SELECT (left, 0.05–0.52) + SELL (right, 0.55–0.95, red tint), replaced by "✓ SELECTED" label when selected.
+- Promo-only ships — yellow-red: same swatch/name layout but **no SELL button**; SELECT spans full width `(0.05–0.95)`. The swatch uses two nested `Image` children (bottom half yellow, top half red) instead of a single solid color.
 
 **Adding a new purchasable ship:** add its card to ToBuyContent and BoughtContent in `BuildShopPanel()`, add corresponding `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` key for ownership, add a new `"SelectedShip"` string value, and extend `RefreshShopUI()` and `ApplySelectedShip()` (in `PlayerShip.cs`) to handle the new variant.
 
-**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()`. It reads `"SelectedShip"` from PlayerPrefs and sets both the color (`hull.material.SetColor("_BaseColor", …)` — uses `.material` instance, not `.sharedMaterial`) and `moveSpeed` on the PlayerShip component.
+**Adding a new promo-only ship:** add its card to BoughtContent only (not ToBuyContent), add `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` ownership key, handle in `RefreshShopUI()` and `ApplySelectedShip()`, add the unlock to the relevant promo code's special-case block in `OnRedeemPromoCode()`, and add ship-revocation to the `resett` block (model after the `pizza1WasReset` pattern).
+
+**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()` after the default HP/health-bar setup. It reads `"SelectedShip"` from PlayerPrefs and sets hull color, cabin color (`hull.material.SetColor("_BaseColor", …)` — `.material` instance, not `.sharedMaterial`), `moveSpeed`, `maxHP`, and `currentHP`, then refreshes the health bar. The yellow-red ship uses split colors: yellow hull + red cabin.
 
 ### Core Script Relationships
 
@@ -101,14 +107,16 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. It aims at t
 ### Game Balance Values
 | Stat | Value |
 |---|---|
-| Ship HP (both) | 245 |
-| Torpedo damage | 35 (7 hits to kill) |
+| Ship HP — blue / yellow | 245 (7 torpedo hits) |
+| Ship HP — yellow-red | 280 (8 torpedo hits) |
+| Torpedo damage | 35 |
 | Torpedo speed | 50 units/s |
 | Torpedo lifetime | 5 s |
 | Player fire cooldown | 2 s |
 | Bot fire interval | 1.6–2.4 s random |
 | Player move speed — blue ship | 15 units/s |
 | Player move speed — yellow ship | 30 units/s (2× blue) |
+| Player move speed — yellow-red ship | 18 units/s (1.2× blue) |
 | Bot move speed | 10 units/s |
 | Yellow ship cost | 150 coins |
 | Yellow ship sell price | 75 coins (half price) |

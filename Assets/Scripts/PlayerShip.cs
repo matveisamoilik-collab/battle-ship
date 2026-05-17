@@ -34,16 +34,25 @@ public class PlayerShip : MonoBehaviour
 
     void ApplySelectedShip()
     {
-        string selected = PlayerPrefs.GetString("SelectedShip", "blue");
-        bool yellow = selected == "yellow";
+        string selected  = PlayerPrefs.GetString("SelectedShip", "blue");
+        bool yellow      = selected == "yellow";
+        bool yellowRed   = selected == "yellowred";
 
-        Color color = yellow ? new Color(1.0f, 0.85f, 0.0f) : new Color(0.30f, 0.40f, 0.70f);
-        moveSpeed   = yellow ? 30f : 15f;
+        Color hullColor  = yellow    ? new Color(1.0f, 0.85f, 0.0f)
+                         : yellowRed ? new Color(1.0f, 0.85f, 0.0f)
+                                     : new Color(0.30f, 0.40f, 0.70f);
+        Color cabinColor = yellowRed ? new Color(0.85f, 0.10f, 0.10f)
+                         : yellow    ? new Color(1.0f, 0.85f, 0.0f)
+                                     : new Color(0.30f, 0.40f, 0.70f);
+        moveSpeed = yellowRed ? 18f : yellow ? 30f : 15f;
+        maxHP     = yellowRed ? 280f : 245f;
+        currentHP = maxHP;
 
         var hull  = transform.Find("Hull")?.GetComponent<MeshRenderer>();
         var cabin = transform.Find("Cabin")?.GetComponent<MeshRenderer>();
-        if (hull  != null) hull.material.SetColor("_BaseColor", color);
-        if (cabin != null) cabin.material.SetColor("_BaseColor", color);
+        if (hull  != null) hull.material.SetColor("_BaseColor", hullColor);
+        if (cabin != null) cabin.material.SetColor("_BaseColor", cabinColor);
+        if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
     }
 
     void Update()

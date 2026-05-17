@@ -20,8 +20,16 @@ public class MainMenu : MonoBehaviour
     public Text   yellowShipSelectedLabel;
     public Button yellowShipSellButton;
 
+    public GameObject yellowRedShipBoughtCard;
+    public Button     yellowRedShipSelectButton;
+    public Text       yellowRedShipSelectedLabel;
+
     public InputField promoCodeInput;
     public Text       promoFeedbackText;
+
+    private static readonly string[] s_validPromoCodes =
+        { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8" };
+    private const int PromoCodeReward = 5;
 
     void Start()
     {
@@ -91,6 +99,13 @@ public class MainMenu : MonoBehaviour
         if (yellowShipSelectButton  != null) yellowShipSelectButton.gameObject.SetActive(yellowOwned && !yellowSelected);
         if (yellowShipSellButton    != null) yellowShipSellButton.gameObject.SetActive(yellowOwned && !yellowSelected);
         if (yellowShipSelectedLabel != null) yellowShipSelectedLabel.gameObject.SetActive(yellowOwned && yellowSelected);
+
+        bool yellowRedOwned    = PlayerPrefs.GetInt("YellowRedShipOwned", 0) == 1;
+        bool yellowRedSelected = selected == "yellowred";
+
+        if (yellowRedShipBoughtCard    != null) yellowRedShipBoughtCard.SetActive(yellowRedOwned);
+        if (yellowRedShipSelectButton  != null) yellowRedShipSelectButton.gameObject.SetActive(yellowRedOwned && !yellowRedSelected);
+        if (yellowRedShipSelectedLabel != null) yellowRedShipSelectedLabel.gameObject.SetActive(yellowRedOwned && yellowRedSelected);
     }
 
     public void OnSelectBlueShip()
@@ -103,6 +118,13 @@ public class MainMenu : MonoBehaviour
     public void OnSelectYellowShip()
     {
         PlayerPrefs.SetString("SelectedShip", "yellow");
+        PlayerPrefs.Save();
+        RefreshShopUI();
+    }
+
+    public void OnSelectYellowRedShip()
+    {
+        PlayerPrefs.SetString("SelectedShip", "yellowred");
         PlayerPrefs.Save();
         RefreshShopUI();
     }
@@ -136,9 +158,37 @@ public class MainMenu : MonoBehaviour
         if (promoCodeInput == null || promoFeedbackText == null) return;
 
         string code = promoCodeInput.text.Trim().ToLower();
-        var validCodes = new[] { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8" };
 
-        bool isValid = System.Array.IndexOf(validCodes, code) >= 0;
+        if (code == "resett")
+        {
+            int refunded = 0;
+            bool pizza1WasReset = false;
+            foreach (var c in s_validPromoCodes)
+            {
+                string key = "Promo_" + c;
+                if (PlayerPrefs.GetInt(key, 0) == 1)
+                {
+                    CoinManager.Instance?.AddCoins(-PromoCodeReward);
+                    PlayerPrefs.SetInt(key, 0);
+                    refunded++;
+                    if (c == "pizza1") pizza1WasReset = true;
+                }
+            }
+            if (pizza1WasReset)
+            {
+                PlayerPrefs.SetInt("YellowRedShipOwned", 0);
+                if (PlayerPrefs.GetString("SelectedShip", "blue") == "yellowred")
+                    PlayerPrefs.SetString("SelectedShip", "blue");
+            }
+            PlayerPrefs.Save();
+            promoCodeInput.text     = "";
+            promoFeedbackText.color = Color.cyan;
+            promoFeedbackText.text  = refunded > 0 ? $"Reset {refunded} code(s)." : "Nothing to reset.";
+            RefreshShopUI();
+            return;
+        }
+
+        bool isValid = System.Array.IndexOf(s_validPromoCodes, code) >= 0;
         if (!isValid)
         {
             promoFeedbackText.color = Color.red;
@@ -154,12 +204,22 @@ public class MainMenu : MonoBehaviour
             return;
         }
 
-        CoinManager.Instance?.AddCoins(5);
+        CoinManager.Instance?.AddCoins(PromoCodeReward);
         PlayerPrefs.SetInt(prefsKey, 1);
         PlayerPrefs.Save();
+        if (code == "pizza1")
+        {
+            PlayerPrefs.SetInt("YellowRedShipOwned", 1);
+            PlayerPrefs.Save();
+            promoCodeInput.text     = "";
+            promoFeedbackText.color = Color.green;
+            promoFeedbackText.text  = $"+{PromoCodeReward} COINS + SHIP!";
+            RefreshShopUI();
+            return;
+        }
         promoCodeInput.text     = "";
         promoFeedbackText.color = Color.green;
-        promoFeedbackText.text  = "+5 COINS!";
+        promoFeedbackText.text  = $"+{PromoCodeReward} COINS!";
         RefreshShopUI();
     }
 }
