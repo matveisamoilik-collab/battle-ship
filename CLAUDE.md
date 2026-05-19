@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo battle between a player-controlled ship and a bot. It is a native Unity project — there are no npm/yarn scripts, Makefiles, or CLI build commands. All building, running, and testing is done through the Unity Editor.
 
+**Target platform:** Android. The game is locked to **landscape orientation only** (`allowedAutorotateToPortrait: 0`, `allowedAutorotateToPortraitUpsideDown: 0` in `ProjectSettings/ProjectSettings.asset`).
+
 **Coin economy:** Win awards +20 coins, losing awards +1 consolation coin. Stored in `PlayerPrefs` under key `"Coins"` via `CoinManager`. `CoinManager.AddCoins(amount)` accepts negative values (used for purchases).
 
 **PlayerPrefs keys** (all persistence is via PlayerPrefs — no save files):
