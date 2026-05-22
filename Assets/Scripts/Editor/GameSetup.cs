@@ -493,6 +493,57 @@ public static class GameSetup
         coinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
         gm.coinsText = coinGO.GetComponent<Text>();
 
+        // ----- Mobile Controls -----
+        var circleSprite = MakeCircleSprite();
+
+        // Joystick background — bottom-left
+        var joyBgGO = new GameObject("JoystickBackground");
+        joyBgGO.transform.SetParent(hudGO.transform, false);
+        var joyBgImg = joyBgGO.AddComponent<Image>();
+        joyBgImg.sprite = circleSprite;
+        joyBgImg.color  = new Color(1f, 1f, 1f, 0.25f);
+        var joyBgRT = joyBgGO.GetComponent<RectTransform>();
+        joyBgRT.anchorMin        = new Vector2(0f, 0f);
+        joyBgRT.anchorMax        = new Vector2(0f, 0f);
+        joyBgRT.pivot            = new Vector2(0.5f, 0.5f);
+        joyBgRT.anchoredPosition = new Vector2(150f, 150f);
+        joyBgRT.sizeDelta        = new Vector2(260f, 260f);
+
+        // Joystick stick — centered inside background
+        var joyStickGO = new GameObject("JoystickStick");
+        joyStickGO.transform.SetParent(joyBgGO.transform, false);
+        var joyStickImg = joyStickGO.AddComponent<Image>();
+        joyStickImg.sprite = circleSprite;
+        joyStickImg.color  = new Color(1f, 1f, 1f, 0.75f);
+        var joyStickRT = joyStickGO.GetComponent<RectTransform>();
+        joyStickRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        joyStickRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        joyStickRT.pivot            = new Vector2(0.5f, 0.5f);
+        joyStickRT.anchoredPosition = Vector2.zero;
+        joyStickRT.sizeDelta        = new Vector2(110f, 110f);
+
+        // VirtualJoystick script on background
+        var joystick = joyBgGO.AddComponent<VirtualJoystick>();
+        joystick.background = joyBgRT;
+        joystick.stick      = joyStickRT;
+
+        // Fire zone — right 55% of screen, transparent
+        var fireZoneGO = new GameObject("FireZone");
+        fireZoneGO.transform.SetParent(hudGO.transform, false);
+        var fireZoneImg = fireZoneGO.AddComponent<Image>();
+        fireZoneImg.color         = new Color(0f, 0f, 0f, 0f);
+        fireZoneImg.raycastTarget = false;
+        var fireZoneRT = fireZoneGO.GetComponent<RectTransform>();
+        fireZoneRT.anchorMin  = new Vector2(0.45f, 0f);
+        fireZoneRT.anchorMax  = new Vector2(1f, 1f);
+        fireZoneRT.offsetMin  = Vector2.zero;
+        fireZoneRT.offsetMax  = Vector2.zero;
+        var fireZone = fireZoneGO.AddComponent<FireZone>();
+
+        // Wire mobile controls to player ship
+        playerShip.virtualJoystick = joystick;
+        playerShip.fireZone        = fireZone;
+
         EditorSceneManager.SaveScene(scene, "Assets/Scenes/GameScene.unity");
         Debug.Log("[ShipButtlr] GameScene saved.");
     }
@@ -746,6 +797,20 @@ public static class GameSetup
     }
 
     // Creates a legacy UI.Text GameObject
+    static Sprite MakeCircleSprite(int size = 128)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        float r = size * 0.5f;
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - r, dy = y - r;
+                tex.SetPixel(x, y, dx * dx + dy * dy <= r * r ? Color.white : Color.clear);
+            }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+    }
+
     static GameObject MakeText(string name, Transform parent, string content,
                                 int fontSize, Color color)
     {

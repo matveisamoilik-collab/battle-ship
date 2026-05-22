@@ -16,6 +16,10 @@ public class PlayerShip : MonoBehaviour
     public float maxHP = 245f;
     public HealthBar healthBar;
 
+    [Header("Mobile Controls")]
+    public VirtualJoystick virtualJoystick;
+    public FireZone fireZone;
+
     private float currentHP;
     private float lastFireTime;
     private IslandData[] islands;
@@ -66,13 +70,20 @@ public class PlayerShip : MonoBehaviour
     void HandleMovement()
     {
         var kb = Keyboard.current;
-        if (kb == null) return;
 
         float forward = 0f, turn = 0f;
-        if (kb.wKey.isPressed || kb.upArrowKey.isPressed) forward += 1f;
-        if (kb.sKey.isPressed || kb.downArrowKey.isPressed) forward -= 1f;
-        if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) turn += 1f;
-        if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) turn -= 1f;
+        if (kb != null)
+        {
+            if (kb.wKey.isPressed || kb.upArrowKey.isPressed)   forward += 1f;
+            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) forward -= 1f;
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) turn   += 1f;
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed)  turn   -= 1f;
+        }
+        if (virtualJoystick != null)
+        {
+            forward = Mathf.Clamp(forward + virtualJoystick.Direction.y, -1f, 1f);
+            turn    = Mathf.Clamp(turn    + virtualJoystick.Direction.x, -1f, 1f);
+        }
 
         transform.Rotate(Vector3.up, turn * rotationSpeed * Time.deltaTime);
         transform.position += transform.forward * forward * moveSpeed * Time.deltaTime;
@@ -137,7 +148,8 @@ public class PlayerShip : MonoBehaviour
         var kb = Keyboard.current;
         var mouse = Mouse.current;
         bool firePressed = (kb != null && kb.spaceKey.isPressed)
-                        || (mouse != null && mouse.leftButton.isPressed);
+                        || (mouse != null && mouse.leftButton.isPressed)
+                        || (fireZone != null && fireZone.IsPressed);
 
         if (firePressed && Time.time >= lastFireTime + fireInterval)
         {

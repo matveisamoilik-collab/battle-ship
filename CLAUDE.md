@@ -29,19 +29,21 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 
 ## Player Controls
 
-- **Move**: WASD or arrow keys (forward/back/turn)
-- **Fire**: Space or left mouse button — 2 s cooldown between shots
+- **Move**: WASD or arrow keys (forward/back/turn) **or virtual joystick** (left side of screen on Android)
+- **Fire**: Space or left mouse button **or tap right side of screen** — 2 s cooldown between shots
 
 ## Architecture
 
 ### Tech Stack
 - **Engine:** Unity 6000.3.7f1 with Universal Render Pipeline (URP) 17.3.0
-- **Input:** Unity New Input System 1.18.0 — existing gameplay scripts poll `Keyboard.current` / `Mouse.current` directly rather than using the generated `InputSystem_Actions` class
+- **Input:** Unity New Input System 1.18.0 — gameplay scripts poll `Keyboard.current` / `Mouse.current` / `Touchscreen.current` directly rather than using the generated `InputSystem_Actions` class
 - **UI:** Legacy `UnityEngine.UI` (`Text`, `Image`, `Button`, `InputField`) — not TextMeshPro. `GameSetup` uses `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")`. Canvas mode: `ScreenSpaceOverlay`, `ScaleWithScreenSize` at 1920×1080.
 - **Scripting:** C# targeting .NET Standard 2.1
 
 ### Key Directories
 - `Assets/Scripts/` — all game logic scripts
+- `Assets/Scripts/VirtualJoystick.cs` — mobile joystick; exposes `Direction` (Vector2 −1…1); uses UI pointer events (`IPointerDownHandler`, `IDragHandler`, `IPointerUpHandler`)
+- `Assets/Scripts/FireZone.cs` — mobile fire zone; exposes `IsPressed`; polls `Touchscreen.current` in `Update()` (NOT UI events — avoids blocking the End Panel buttons)
 - `Assets/Scripts/Editor/GameSetup.cs` — editor-only tool; run via `ShipButtlr > Build All`
 - `Assets/Scenes/MainMenu.unity` / `Assets/Scenes/GameScene.unity` — the two scenes in build order
 - `Assets/Prefabs/` — `Torpedo.prefab`, `ExplosionEffect.prefab` (created by Build All)
@@ -74,6 +76,30 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 **Adding a new promo-only ship:** add its card to BoughtContent only (not ToBuyContent), add `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` ownership key, handle in `RefreshShopUI()` and `ApplySelectedShip()`, add the unlock to the relevant promo code's special-case block in `OnRedeemPromoCode()`, and add ship-revocation to the `resett` block (model after the `pizza1WasReset` pattern).
 
 **Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()` after the default HP/health-bar setup. It reads `"SelectedShip"` from PlayerPrefs and sets hull color, cabin color (`hull.material.SetColor("_BaseColor", …)` — `.material` instance, not `.sharedMaterial`), `moveSpeed`, `maxHP`, and `currentHP`, then refreshes the health bar. The yellow-red ship uses split colors: yellow hull + red cabin.
+
+### Mobile Controls (Android)
+
+Both keyboard and touch inputs are active simultaneously — works in Editor (keyboard) and on device (touch).
+
+**Virtual Joystick** (`VirtualJoystick.cs`):
+- Fixed position, bottom-left of HUD canvas: 260×260 circle at anchoredPosition `(150, 150)` from the `(0,0)` anchor
+- Background circle (white, 25 % alpha) + inner stick circle (white, 75 % alpha, 110×110)
+- Uses Unity UI pointer events — `raycastTarget = true` on its Image, so it participates in the UI event system
+- `PlayerShip` reads `virtualJoystick.Direction` (Vector2) and adds it to keyboard forward/turn each frame
+
+**Fire Zone** (`FireZone.cs`):
+- Covers the right 55 % of screen (`anchorMin.x = 0.45`), transparent Image with **`raycastTarget = false`**
+- Uses `Touchscreen.current` in `Update()` — checks if any active touch has `position.x > Screen.width * 0.45f`
+- **Do NOT switch to UI pointer events** — doing so would re-introduce the bug where the transparent panel absorbs taps meant for the End Panel "PLAY AGAIN" / "MAIN MENU" buttons (FireZone is the last sibling in the HUD canvas, so it would be the topmost raycast target)
+- `PlayerShip` reads `fireZone.IsPressed` in `HandleFiring()`; automatically returns false when `GameManager.IsGameOver`
+
+**`PlayerShip.HandleMovement()` input order:**
+1. Read keyboard (null-checked — `Keyboard.current` is null on Android with no physical keyboard)
+2. Add joystick direction, clamp result to −1…1
+3. Apply movement
+
+**HUD canvas sibling order** (matters for raycast priority — last = topmost):
+`PlayerHP` → `BotHP` → `EndPanel` → `CoinText` → `JoystickBackground` → `FireZone`
 
 ### Core Script Relationships
 
