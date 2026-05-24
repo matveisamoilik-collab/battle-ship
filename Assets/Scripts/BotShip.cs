@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class BotShip : MonoBehaviour
 {
-    public enum AIState { APPROACH, FLANK, RETREAT }
+    public enum AIState { AIM, REPOSITION }
 
     [Header("Movement")]
     public float moveSpeed = 10f;
@@ -16,12 +16,15 @@ public class BotShip : MonoBehaviour
     public float maxHP = 245f;
     public HealthBar healthBar;
 
+    private const float MinPlayerDist = 18f; // 1.5 hull lengths — bot never crosses this
+    private const float FiringArc = 10f;     // fire only when player is within this bow cone
+
     private float currentHP;
-    private AIState state = AIState.APPROACH;
+    private AIState state = AIState.AIM;
     private Transform player;
     private float nextFireTime;
-    private float retreatTimer;
-    private float flankAngle;
+    private float postFireDist;
+    private Quaternion postFireTarget;
     private IslandData[] islands;
 
     void Start()
@@ -41,66 +44,78 @@ public class BotShip : MonoBehaviour
         if (GameManager.Instance != null && GameManager.Instance.IsGameOver) return;
         if (player == null) return;
 
-        UpdateState();
         ExecuteState();
         ClampToBounds();
-        HandleFire();
-    }
-
-    void UpdateState()
-    {
-        float dist = Vector3.Distance(transform.position, player.position);
-        float hpPercent = currentHP / maxHP;
-
-        // RETREAT overrides everything; count down then return to APPROACH
-        if (state == AIState.RETREAT)
-        {
-            retreatTimer -= Time.deltaTime;
-            if (retreatTimer <= 0f) state = AIState.APPROACH;
-            return;
-        }
-
-        if (hpPercent < 0.3f)
-        {
-            state = AIState.RETREAT;
-            retreatTimer = 3f;
-            return;
-        }
-
-        if (state == AIState.APPROACH && dist < 45f)
-            state = AIState.FLANK;
-        else if (state == AIState.FLANK && dist > 55f)
-            state = AIState.APPROACH;
     }
 
     void ExecuteState()
     {
         switch (state)
         {
-            case AIState.APPROACH:
+            case AIState.AIM:
+                // Turn bow onto the player and close in — but never inside MinPlayerDist.
                 RotateToward(player.position);
-                MoveForward();
+                MoveForwardClamped();
+                if (Time.time >= nextFireTime && PlayerInFiringArc())
+                {
+                    FireTorpedo();
+                    BeginReposition();
+                }
                 break;
 
-            case AIState.FLANK:
-                // Orbit at 40-unit radius around the player
-                flankAngle += 45f * Time.deltaTime;
-                Vector3 orbitOffset = new Vector3(
-                    Mathf.Sin(flankAngle * Mathf.Deg2Rad),
-                    0f,
-                    Mathf.Cos(flankAngle * Mathf.Deg2Rad)) * 40f;
-                RotateToward(player.position + orbitOffset);
-                MoveForward();
-                // Keep bow pointed at player regardless of travel direction
-                RotateToward(player.position);
-                break;
-
-            case AIState.RETREAT:
-                Vector3 awayDir = (transform.position - player.position).normalized;
-                RotateToward(transform.position + awayDir * 10f);
-                MoveForward();
+            case AIState.REPOSITION:
+                // Post-fire: hold the peel-off heading and drive 2 hull lengths forward.
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, postFireTarget, rotationSpeed * Time.deltaTime);
+                postFireDist -= MoveForwardClamped();
+                if (postFireDist <= 0f) state = AIState.AIM;
                 break;
         }
+    }
+
+    bool PlayerInFiringArc()
+    {
+        Vector3 toPlayer = player.position - transform.position;
+        toPlayer.y = 0f;
+        if (toPlayer.sqrMagnitude < 0.01f) return false;
+        return Vector3.Angle(transform.forward, toPlayer) <= FiringArc;
+    }
+
+    void BeginReposition()
+    {
+        // "Turn a bit": peel off roughly perpendicular to the player (random side, small jitter)
+        // so the bot circles the player rather than charging straight in.
+        Vector3 toPlayer = player.position - transform.position;
+        toPlayer.y = 0f;
+        toPlayer = toPlayer.sqrMagnitude > 0.01f ? toPlayer.normalized : transform.forward;
+        float side = Random.value > 0.5f ? 1f : -1f;
+        Vector3 tangent = new Vector3(-toPlayer.z, 0f, toPlayer.x) * side;
+        Vector3 peelDir = Quaternion.Euler(0f, Random.Range(-25f, 25f), 0f) * tangent;
+        postFireTarget = Quaternion.LookRotation(peelDir);
+        postFireDist = 24f; // 2 blue hull lengths
+        state = AIState.REPOSITION;
+    }
+
+    // Steps forward, but never lets the bot cross inside MinPlayerDist of the player —
+    // a step that would penetrate is projected onto the 18-unit ring (the bot slides / circles).
+    // Returns the distance actually travelled this frame.
+    float MoveForwardClamped()
+    {
+        Vector3 start = transform.position;
+        Vector3 desired = start + transform.forward * moveSpeed * Time.deltaTime;
+        desired.y = 0f;
+
+        Vector3 p = new Vector3(player.position.x, 0f, player.position.z);
+        if (Vector3.Distance(desired, p) < MinPlayerDist)
+        {
+            Vector3 dir = desired - p;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) dir = start - p;
+            desired = p + dir.normalized * MinPlayerDist;
+        }
+
+        transform.position = desired;
+        return Vector3.Distance(start, transform.position);
     }
 
     void RotateToward(Vector3 targetPos)
@@ -112,11 +127,6 @@ public class BotShip : MonoBehaviour
         transform.rotation = Quaternion.RotateTowards(
             transform.rotation, targetRot,
             rotationSpeed * Time.deltaTime);
-    }
-
-    void MoveForward()
-    {
-        transform.position += transform.forward * moveSpeed * Time.deltaTime;
     }
 
     void ClampToBounds()
@@ -166,13 +176,12 @@ public class BotShip : MonoBehaviour
         return pos;
     }
 
-    void HandleFire()
+    void FireTorpedo()
     {
-        if (Time.time < nextFireTime) return;
         if (torpedoPrefab == null || torpedoSpawnPoint == null) return;
 
-        // Aim directly at player position at fire time
-        Vector3 aimDir = (player.position - torpedoSpawnPoint.position);
+        // Aim at the player — only reachable when the player is within the bow arc.
+        Vector3 aimDir = player.position - torpedoSpawnPoint.position;
         aimDir.y = 0f;
         if (aimDir.sqrMagnitude < 0.01f) return;
         Quaternion aimRot = Quaternion.LookRotation(aimDir.normalized);

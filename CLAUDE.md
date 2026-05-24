@@ -123,12 +123,15 @@ GameManager (non-persistent singleton, IsGameOver)
 
 **GameManager** is a non-persistent singleton (not `DontDestroyOnLoad`). It sets `Time.timeScale = 0f` on game-over and restores it to `1f` on scene reload. `ShakeCamera(duration, magnitude)` is the public entry point for all camera shake — do not call `CameraFollow.Shake()` directly.
 
-**BotShip AI** has three states driven by distance and HP:
-- `APPROACH` (default) → moves toward player; transitions to `FLANK` when distance < 45
-- `FLANK` → orbits player at ~40-unit radius; transitions back to `APPROACH` when distance > 55
-- `RETREAT` → moves directly away for 3 seconds when HP < 30%; then returns to `APPROACH`
+**BotShip AI** has two states — `AIM` and `REPOSITION` — in a forward-only attack-run loop:
+- `AIM` (default) → rotates bow toward player (`RotateToward`), advances via `MoveForwardClamped()`, fires when player is within 10° of the bow and cooldown is ready, then transitions to `REPOSITION`.
+- `REPOSITION` (post-fire) → rotates to a peel-off heading perpendicular to the player (random side, ±25° jitter), drives 24 units (2 hull lengths) forward via `MoveForwardClamped()`, then returns to `AIM`.
 
-Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. It aims at the player's position at the moment of firing — no leading/prediction.
+Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes are aimed directly at the player's position, but the bot can only fire when the player is within the 10° forward arc (`FiringArc = 10f`) — no side-shots.
+
+**18-unit floor** (`MinPlayerDist = 18f` — 1.5 hull lengths): all movement goes through `MoveForwardClamped()`. Steps that would cross inside 18 units from the player are projected onto the 18-unit ring — the bot slides/circles at the boundary rather than stopping or fleeing. The bot **never retreats** regardless of HP.
+
+**Movement constraints**: bot moves forward only (`transform.forward`) — no strafing. Rotation and movement are strictly separated; only one `RotateToward` call per frame per state.
 
 **Torpedo** collision uses `collision.transform.root` to reach the ship script, since ships are multi-object hierarchies (root → Hull, Cabin, TorpedoSpawn). Tags used: `"Player"`, `"Enemy"`, `"Wall"`, `"Island"`. Collisions against friendly ships are silently ignored. Self-collision on spawn is prevented by a 0.1 s `Invoke` delay. Torpedoes explode on island base colliders (islands are tagged `"Island"`).
 
