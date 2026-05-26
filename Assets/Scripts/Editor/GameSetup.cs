@@ -22,6 +22,7 @@ public static class GameSetup
     {
         EnsureTags();
         CreateFolders();
+        CopyMapImages();
 
         var mats = CreateMaterials();
         var explosionPrefab = CreateExplosionPrefab();
@@ -216,7 +217,41 @@ public static class GameSetup
     }
 
     // -------------------------------------------------------------------------
-    // 6. Main Menu scene
+    // 6. Copy map images into Assets/Resources and import as sprites
+    // -------------------------------------------------------------------------
+
+    static void CopyMapImages()
+    {
+        string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+        string srcDir = System.IO.Path.Combine(projectRoot, "images");
+        string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
+
+        foreach (string lvl in new[] { "Level_1", "Level_2" })
+        {
+            string src = System.IO.Path.Combine(srcDir, lvl + ".png");
+            string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
+            if (System.IO.File.Exists(src))
+                System.IO.File.Copy(src, dst, overwrite: true);
+            else
+                Debug.LogWarning("[ShipButtlr] Map image not found: " + src);
+        }
+
+        AssetDatabase.Refresh();
+
+        foreach (string lvl in new[] { "Level_1", "Level_2" })
+        {
+            string assetPath = "Assets/Resources/" + lvl + ".png";
+            var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null) continue;
+            importer.textureType      = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.mipmapEnabled    = false;
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Main Menu scene
     // -------------------------------------------------------------------------
 
     static void BuildMainMenuScene()
@@ -282,16 +317,24 @@ public static class GameSetup
         // Play button
         var playBtnGO = MakeButton("PlayButton", canvasGO.transform, "PLAY");
         var playRT    = playBtnGO.GetComponent<RectTransform>();
-        playRT.anchorMin        = new Vector2(0.5f, 0.48f);
-        playRT.anchorMax        = new Vector2(0.5f, 0.58f);
+        playRT.anchorMin        = new Vector2(0.5f, 0.56f);
+        playRT.anchorMax        = new Vector2(0.5f, 0.65f);
         playRT.sizeDelta        = new Vector2(300f, 70f);
         playRT.anchoredPosition = Vector2.zero;
+
+        // Map button
+        var mapBtnGO = MakeButton("MapButton", canvasGO.transform, "MAP");
+        var mapBtnRT = mapBtnGO.GetComponent<RectTransform>();
+        mapBtnRT.anchorMin        = new Vector2(0.5f, 0.44f);
+        mapBtnRT.anchorMax        = new Vector2(0.5f, 0.53f);
+        mapBtnRT.sizeDelta        = new Vector2(300f, 70f);
+        mapBtnRT.anchoredPosition = Vector2.zero;
 
         // Shop button
         var shopBtnGO = MakeButton("ShopButton", canvasGO.transform, "SHOP");
         var shopBtnRT = shopBtnGO.GetComponent<RectTransform>();
-        shopBtnRT.anchorMin        = new Vector2(0.5f, 0.34f);
-        shopBtnRT.anchorMax        = new Vector2(0.5f, 0.44f);
+        shopBtnRT.anchorMin        = new Vector2(0.5f, 0.32f);
+        shopBtnRT.anchorMax        = new Vector2(0.5f, 0.41f);
         shopBtnRT.sizeDelta        = new Vector2(300f, 70f);
         shopBtnRT.anchoredPosition = Vector2.zero;
 
@@ -299,7 +342,7 @@ public static class GameSetup
         var quitBtnGO = MakeButton("QuitButton", canvasGO.transform, "QUIT");
         var quitRT    = quitBtnGO.GetComponent<RectTransform>();
         quitRT.anchorMin        = new Vector2(0.5f, 0.20f);
-        quitRT.anchorMax        = new Vector2(0.5f, 0.30f);
+        quitRT.anchorMax        = new Vector2(0.5f, 0.29f);
         quitRT.sizeDelta        = new Vector2(300f, 70f);
         quitRT.anchoredPosition = Vector2.zero;
 
@@ -307,6 +350,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             playBtnGO.GetComponent<Button>().onClick,
             mainMenuScript.OnPlayClicked);
+        UnityEventTools.AddPersistentListener(
+            mapBtnGO.GetComponent<Button>().onClick,
+            mainMenuScript.OnMapClicked);
         UnityEventTools.AddPersistentListener(
             shopBtnGO.GetComponent<Button>().onClick,
             mainMenuScript.OnShopClicked);
@@ -336,9 +382,13 @@ public static class GameSetup
         mmLevelGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
         mainMenuScript.levelText = mmLevelGO.GetComponent<Text>();
 
-        // Shop panel — built last so it renders on top; hidden by default
+        // Shop panel — hidden by default
         var shopPanelGO = BuildShopPanel(canvasGO.transform, mainMenuScript);
         shopPanelGO.SetActive(false);
+
+        // Map panel — built after shop so it renders on top; hidden by default
+        var mapPanelGO = BuildMapPanel(canvasGO.transform, mainMenuScript);
+        mapPanelGO.SetActive(false);
 
         EditorSceneManager.SaveScene(scene, "Assets/Scenes/MainMenu.unity");
         Debug.Log("[ShipButtlr] MainMenu scene saved.");
@@ -851,6 +901,78 @@ public static class GameSetup
         txt.alignment = TextAnchor.MiddleCenter;
         txt.supportRichText = false;
         return go;
+    }
+
+    // Builds the map overlay panel; sprites are loaded at runtime by MainMenu.RefreshMapImage()
+    static GameObject BuildMapPanel(Transform canvasTransform, MainMenu script)
+    {
+        // Full-screen dark overlay
+        var panel = new GameObject("MapPanel");
+        panel.transform.SetParent(canvasTransform, false);
+        var bgImg = panel.AddComponent<Image>();
+        bgImg.color = new Color(0f, 0f, 0f, 0.85f);
+        var panelRT = panel.GetComponent<RectTransform>();
+        panelRT.anchorMin = Vector2.zero;
+        panelRT.anchorMax = Vector2.one;
+        panelRT.offsetMin = Vector2.zero;
+        panelRT.offsetMax = Vector2.zero;
+
+        // Map image — fills the entire panel; sprite swapped at runtime
+        var mapImgGO = new GameObject("MapImage");
+        mapImgGO.transform.SetParent(panel.transform, false);
+        var mapImg = mapImgGO.AddComponent<Image>();
+        mapImg.color = Color.white;
+        var mapRT = mapImgGO.GetComponent<RectTransform>();
+        mapRT.anchorMin = Vector2.zero;
+        mapRT.anchorMax = Vector2.one;
+        mapRT.offsetMin = Vector2.zero;
+        mapRT.offsetMax = Vector2.zero;
+
+        // Island 1 — Coral Cove (always unlocked)
+        // Normalized pos on Level_1.png: center ~(13% left, 76% from top) → Unity y = 24% from bottom
+        var isle1GO = new GameObject("Island1Button");
+        isle1GO.transform.SetParent(panel.transform, false);
+        isle1GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f); // transparent hit area
+        var isle1Btn = isle1GO.AddComponent<Button>();
+        var isle1RT  = isle1GO.GetComponent<RectTransform>();
+        isle1RT.anchorMin = new Vector2(0.07f, 0.17f);
+        isle1RT.anchorMax = new Vector2(0.19f, 0.31f);
+        isle1RT.offsetMin = Vector2.zero;
+        isle1RT.offsetMax = Vector2.zero;
+
+        // Island 2 — Pirate's Rest (locked until CurrentLevel >= 2)
+        // Normalized pos on Level_2.png: center ~(26% left, 46% from top) → Unity y = 54% from bottom
+        var isle2GO = new GameObject("Island2Button");
+        isle2GO.transform.SetParent(panel.transform, false);
+        isle2GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f); // transparent hit area
+        var isle2Btn = isle2GO.AddComponent<Button>();
+        var isle2RT  = isle2GO.GetComponent<RectTransform>();
+        isle2RT.anchorMin = new Vector2(0.20f, 0.47f);
+        isle2RT.anchorMax = new Vector2(0.32f, 0.61f);
+        isle2RT.offsetMin = Vector2.zero;
+        isle2RT.offsetMax = Vector2.zero;
+
+        // Close button — top-right corner
+        var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
+        var closeRT    = closeBtnGO.GetComponent<RectTransform>();
+        closeRT.anchorMin        = new Vector2(0.93f, 0.94f);
+        closeRT.anchorMax        = new Vector2(0.99f, 0.99f);
+        closeRT.sizeDelta        = Vector2.zero;
+        closeRT.anchoredPosition = Vector2.zero;
+
+        // Assign references to MainMenu
+        script.mapPanel      = panel;
+        script.mapImage      = mapImg;
+        script.island2Button = isle2Btn;
+
+        // Wire callbacks
+        UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
+        UnityEventTools.AddPersistentListener(isle2Btn.onClick, script.OnIsland2Clicked);
+        UnityEventTools.AddPersistentListener(
+            closeBtnGO.GetComponent<Button>().onClick,
+            script.OnCloseMapClicked);
+
+        return panel;
     }
 
     // Builds the full shop overlay panel and wires all callbacks

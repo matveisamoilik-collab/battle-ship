@@ -18,7 +18,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"YellowRedShipOwned"` | int | 0 | 1 = yellow-red ship unlocked via `pizza1` |
 | `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, or `"yellowred"` |
 | `"Promo_pizza1"` … `"Promo_pizza8"` | int | 0 | 1 = promo code already redeemed |
-| `"CurrentLevel"` | int | 1 | Active level: 1 (open water) or 2 (islands) |
+| `"CurrentLevel"` | int | 1 | Highest unlocked level: 1 (open water) or 2 (islands) |
 
 ## Development Workflow
 
@@ -170,13 +170,45 @@ Both ships move via direct `transform.position +=` — Unity physics does not ru
 
 ### Levels System
 
-Two levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key.
+Two levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key (highest unlocked level — never decreases).
 
-- **Level 1** — open water: all 6 islands are parented under an `IslandsRoot` GameObject. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `CurrentLevel == 1`. This runs before any `Start()`, so `FindObjectsOfType<IslandData>()` in ship scripts returns an empty array — island collision is a no-op.
+- **Level 1** — open water: all 6 islands are parented under an `IslandsRoot` GameObject. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. This runs before any `Start()`, so `FindObjectsOfType<IslandData>()` in ship scripts returns an empty array — island collision is a no-op.
 - **Level 2** — existing map: `IslandsRoot` stays active; islands behave as before.
-- **Progression**: `GameManager.BotDefeated()` advances `"CurrentLevel"` from 1 → 2 on a win (capped at 2). Loss never changes the level. "Play Again" reloads the scene and picks up the updated level.
-- **UI**: A `"LEVEL: X"` text (black, 30pt) sits below the coin counter (top-left, anchoredPosition `(20, -75)`) on both the MainMenu canvas (`MainMenu.levelText`) and the GameScene HUD (`GameManager.levelText`). MainMenu sets it in `Start()`; GameManager sets it in `Start()`.
+- **Progression**: `GameManager.BotDefeated()` advances `"CurrentLevel"` from 1 → 2 on a win (capped at 2, reads PlayerPrefs). Loss never changes the level.
+- **Play Again after win**: advances to `playingLevel + 1` (capped at 2). Play Again after loss replays the same level.
+- **UI**: A `"LEVEL: X"` text (black, 30pt) sits below the coin counter (top-left, anchoredPosition `(20, -75)`) on both the MainMenu canvas (`MainMenu.levelText`) and the GameScene HUD (`GameManager.levelText`). GameManager sets it from `playingLevel` in `Start()`.
 - **Coin text color**: yellow (`Color.yellow`) on both canvases. **Level text color**: black (`Color.black`).
+
+### Map Panel
+
+A full-screen map modal on the MainMenu opened via the **MAP** button (between PLAY and SHOP). Shows a treasure-map image with clickable island hit areas.
+
+**Map images** live in `Assets/Resources/` (copied from `images/` at project root by `GameSetup.CopyMapImages()` during Build All, imported as Sprites):
+- `Level_1.png` — Coral Cove bright, rest dim. Shown when `CurrentLevel == 1`.
+- `Level_2.png` — Coral Cove + Pirate's Rest bright. Shown when `CurrentLevel >= 2`.
+
+**Runtime flow** (`MainMenu.cs`):
+- `OnMapClicked()` → calls `RefreshMapImage()` (loads correct sprite via `Resources.Load<Sprite>()`) → sets `island2Button.interactable` based on `CurrentLevel` → shows panel.
+- `OnIsland1Clicked()` / `OnIsland2Clicked()` → sets `MainMenu.levelToPlay = 1 or 2` → loads GameScene.
+- `OnCloseMapClicked()` → hides panel.
+
+**`MainMenu.levelToPlay` static override** (session-only, not persisted):
+- Default `-1` — GameManager falls back to `PlayerPrefs.GetInt("CurrentLevel", 1)`.
+- Set by map island buttons before loading GameScene.
+- `GameManager.Awake()` reads it into `private int playingLevel`, then resets `levelToPlay = -1`.
+- `MainMenu.Start()` also resets it to `-1` as a safety guard.
+- Normal PLAY button never touches `levelToPlay` — always plays the current progress level.
+
+**`GameManager` fields for level tracking:**
+- `private int playingLevel` — which level this session is actually running (set in Awake, used for HUD and PlayAgain logic).
+- `private bool wonLastGame` — set true in `BotDefeated()`, false by default. Used in `PlayAgain()` to decide whether to advance.
+
+**Map panel structure** (built by `GameSetup.BuildMapPanel()`):
+- `MapPanel` (full-screen, dark overlay) → `MapImage` (fills panel, sprite swapped at runtime) + `Island1Button` + `Island2Button` (transparent hit areas) + `CloseButton` (top-right "X").
+- Island button anchors are estimated from image pixel positions — may need tuning if positions feel off.
+
+**4-button MainMenu layout** (anchor Y bands):
+- PLAY: 0.56–0.65 | MAP: 0.44–0.53 | SHOP: 0.32–0.41 | QUIT: 0.20–0.29
 
 ### Adding New Islands
 Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int treeCount, mats, Transform parent = null)`. Each island root gets an `IslandData` component (runtime data) and the `"Island"` tag. All calls in `BuildGameScene()` pass `islandsRootGO.transform` as the parent so the levels system can toggle them. To add an island: add a `CreateIsland(...)` call in `BuildGameScene()` with `islandsRootGO.transform` as the parent — no other changes needed.

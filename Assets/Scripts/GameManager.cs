@@ -24,6 +24,8 @@ public class GameManager : MonoBehaviour
 
     private bool gameOver = false;
     public bool IsGameOver => gameOver;
+    private int playingLevel;
+    private bool wonLastGame;
 
     void Awake()
     {
@@ -34,7 +36,12 @@ public class GameManager : MonoBehaviour
         }
         Instance = this;
 
-        if (PlayerPrefs.GetInt("CurrentLevel", 1) == 1 && islandsRoot != null)
+        playingLevel = MainMenu.levelToPlay >= 1
+            ? MainMenu.levelToPlay
+            : PlayerPrefs.GetInt("CurrentLevel", 1);
+        MainMenu.levelToPlay = -1;
+
+        if (playingLevel == 1 && islandsRoot != null)
             islandsRoot.SetActive(false);
     }
 
@@ -42,7 +49,7 @@ public class GameManager : MonoBehaviour
     {
         UpdateCoinsText();
         if (levelText != null)
-            levelText.text = "LEVEL: " + PlayerPrefs.GetInt("CurrentLevel", 1);
+            levelText.text = "LEVEL: " + playingLevel;
     }
 
     void UpdateCoinsText()
@@ -64,6 +71,7 @@ public class GameManager : MonoBehaviour
     {
         if (gameOver) return;
         gameOver = true;
+        wonLastGame = true;
         CoinManager.Instance?.AddCoins(20);
         UpdateCoinsText();
 
@@ -93,6 +101,7 @@ public class GameManager : MonoBehaviour
     public void PlayAgain()
     {
         Time.timeScale = 1f;
+        MainMenu.levelToPlay = wonLastGame && playingLevel < 2 ? playingLevel + 1 : playingLevel;
         SceneManager.LoadScene("GameScene");
     }
 

@@ -28,12 +28,19 @@ public class MainMenu : MonoBehaviour
     public InputField promoCodeInput;
     public Text       promoFeedbackText;
 
+    // Map panel
+    public static int levelToPlay = -1;
+    public GameObject mapPanel;
+    public Image      mapImage;
+    public Button     island2Button;
+
     private static readonly string[] s_validPromoCodes =
         { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8" };
     private const int PromoCodeReward = 5;
 
     void Start()
     {
+        levelToPlay = -1;
         RefreshShopUI();
         if (levelText != null)
             levelText.text = "LEVEL: " + PlayerPrefs.GetInt("CurrentLevel", 1);
@@ -224,5 +231,38 @@ public class MainMenu : MonoBehaviour
         promoFeedbackText.color = Color.green;
         promoFeedbackText.text  = $"+{PromoCodeReward} COINS!";
         RefreshShopUI();
+    }
+
+    public void OnMapClicked()
+    {
+        RefreshMapImage();
+        if (island2Button != null)
+            island2Button.interactable = PlayerPrefs.GetInt("CurrentLevel", 1) >= 2;
+        if (mapPanel != null) mapPanel.SetActive(true);
+    }
+
+    public void OnCloseMapClicked()
+    {
+        if (mapPanel != null) mapPanel.SetActive(false);
+    }
+
+    public void OnIsland1Clicked()
+    {
+        levelToPlay = 1;
+        SceneManager.LoadScene("GameScene");
+    }
+
+    public void OnIsland2Clicked()
+    {
+        levelToPlay = 2;
+        SceneManager.LoadScene("GameScene");
+    }
+
+    void RefreshMapImage()
+    {
+        if (mapImage == null) return;
+        string spriteName = PlayerPrefs.GetInt("CurrentLevel", 1) >= 2 ? "Level_2" : "Level_1";
+        var sprite = Resources.Load<Sprite>(spriteName);
+        if (sprite != null) mapImage.sprite = sprite;
     }
 }
