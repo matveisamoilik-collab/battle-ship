@@ -18,6 +18,10 @@ public class GameManager : MonoBehaviour
     [Header("Coins")]
     public Text coinsText;
 
+    [Header("Level")]
+    public GameObject islandsRoot;
+    public Text levelText;
+
     private bool gameOver = false;
     public bool IsGameOver => gameOver;
 
@@ -29,11 +33,16 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        if (PlayerPrefs.GetInt("CurrentLevel", 1) == 1 && islandsRoot != null)
+            islandsRoot.SetActive(false);
     }
 
     void Start()
     {
         UpdateCoinsText();
+        if (levelText != null)
+            levelText.text = "LEVEL: " + PlayerPrefs.GetInt("CurrentLevel", 1);
     }
 
     void UpdateCoinsText()
@@ -57,6 +66,13 @@ public class GameManager : MonoBehaviour
         gameOver = true;
         CoinManager.Instance?.AddCoins(20);
         UpdateCoinsText();
+
+        if (PlayerPrefs.GetInt("CurrentLevel", 1) < 2)
+        {
+            PlayerPrefs.SetInt("CurrentLevel", 2);
+            PlayerPrefs.Save();
+        }
+
         ShowEndPanel("VICTORY!");
     }
 

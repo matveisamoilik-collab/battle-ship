@@ -325,6 +325,17 @@ public static class GameSetup
         mmCoinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
         mainMenuScript.coinsText = mmCoinGO.GetComponent<Text>();
 
+        // Level display — below coins, top-left
+        var mmLevelGO = MakeText("LevelText", canvasGO.transform, "LEVEL: 1", 30, Color.black);
+        var mmLevelRT = mmLevelGO.GetComponent<RectTransform>();
+        mmLevelRT.anchorMin        = new Vector2(0f, 1f);
+        mmLevelRT.anchorMax        = new Vector2(0f, 1f);
+        mmLevelRT.pivot            = new Vector2(0f, 1f);
+        mmLevelRT.anchoredPosition = new Vector2(20f, -75f);
+        mmLevelRT.sizeDelta        = new Vector2(300f, 50f);
+        mmLevelGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
+        mainMenuScript.levelText = mmLevelGO.GetComponent<Text>();
+
         // Shop panel — built last so it renders on top; hidden by default
         var shopPanelGO = BuildShopPanel(canvasGO.transform, mainMenuScript);
         shopPanelGO.SetActive(false);
@@ -379,13 +390,14 @@ public static class GameSetup
         arena.transform.localScale = new Vector3(200f, 1f, 200f);
         arena.GetComponent<MeshRenderer>().sharedMaterial = mats["Water"];
 
-        // Decorative islands with trees (visual only — no colliders)
-        CreateIsland(new Vector3( 72f, 0f,  68f), 12f, 3, mats);
-        CreateIsland(new Vector3(-65f, 0f,  75f),  9f, 2, mats);
-        CreateIsland(new Vector3( 58f, 0f, -72f), 10f, 3, mats);
-        CreateIsland(new Vector3(-80f, 0f, -55f),  8f, 2, mats);
-        CreateIsland(new Vector3( 42f, 0f,  82f),  7f, 2, mats);
-        CreateIsland(new Vector3(-45f, 0f, -80f), 11f, 3, mats);
+        // Decorative islands grouped under IslandsRoot so level 1 can disable them all
+        var islandsRootGO = new GameObject("IslandsRoot");
+        CreateIsland(new Vector3( 72f, 0f,  68f), 12f, 3, mats, islandsRootGO.transform);
+        CreateIsland(new Vector3(-65f, 0f,  75f),  9f, 2, mats, islandsRootGO.transform);
+        CreateIsland(new Vector3( 58f, 0f, -72f), 10f, 3, mats, islandsRootGO.transform);
+        CreateIsland(new Vector3(-80f, 0f, -55f),  8f, 2, mats, islandsRootGO.transform);
+        CreateIsland(new Vector3( 42f, 0f,  82f),  7f, 2, mats, islandsRootGO.transform);
+        CreateIsland(new Vector3(-45f, 0f, -80f), 11f, 3, mats, islandsRootGO.transform);
 
         // Invisible boundary walls (BoxCollider only, tagged "Wall")
         CreateWall("Wall_PosX", new Vector3(105f,  5f, 0f),   new Vector3(10f, 10f, 210f));
@@ -491,7 +503,19 @@ public static class GameSetup
         coinRT.anchoredPosition = new Vector2(20f, -20f);
         coinRT.sizeDelta        = new Vector2(300f, 50f);
         coinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
-        gm.coinsText = coinGO.GetComponent<Text>();
+        gm.coinsText   = coinGO.GetComponent<Text>();
+        gm.islandsRoot = islandsRootGO;
+
+        // Level display — below coins, top-left HUD
+        var levelGO = MakeText("LevelText", hudGO.transform, "LEVEL: 1", 30, Color.black);
+        var levelRT = levelGO.GetComponent<RectTransform>();
+        levelRT.anchorMin        = new Vector2(0f, 1f);
+        levelRT.anchorMax        = new Vector2(0f, 1f);
+        levelRT.pivot            = new Vector2(0f, 1f);
+        levelRT.anchoredPosition = new Vector2(20f, -75f);
+        levelRT.sizeDelta        = new Vector2(300f, 50f);
+        levelGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
+        gm.levelText = levelGO.GetComponent<Text>();
 
         // ----- Mobile Controls -----
         var circleSprite = MakeCircleSprite();
@@ -584,9 +608,11 @@ public static class GameSetup
     }
 
     static void CreateIsland(Vector3 pos, float radius, int treeCount,
-        System.Collections.Generic.Dictionary<string, Material> mats)
+        System.Collections.Generic.Dictionary<string, Material> mats,
+        Transform parent = null)
     {
         var island = new GameObject("Island");
+        if (parent != null) island.transform.SetParent(parent);
         island.transform.position = pos;
         island.tag = "Island";
         island.AddComponent<IslandData>().radius = radius;

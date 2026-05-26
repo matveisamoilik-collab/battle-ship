@@ -18,6 +18,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"YellowRedShipOwned"` | int | 0 | 1 = yellow-red ship unlocked via `pizza1` |
 | `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, or `"yellowred"` |
 | `"Promo_pizza1"` … `"Promo_pizza8"` | int | 0 | 1 = promo code already redeemed |
+| `"CurrentLevel"` | int | 1 | Active level: 1 (open water) or 2 (islands) |
 
 ## Development Workflow
 
@@ -99,7 +100,7 @@ Both keyboard and touch inputs are active simultaneously — works in Editor (ke
 3. Apply movement
 
 **HUD canvas sibling order** (matters for raycast priority — last = topmost):
-`PlayerHP` → `BotHP` → `EndPanel` → `CoinText` → `JoystickBackground` → `FireZone`
+`PlayerHP` → `BotHP` → `EndPanel` → `CoinText` → `LevelText` → `JoystickBackground` → `FireZone`
 
 ### Core Script Relationships
 
@@ -167,8 +168,18 @@ Both ships move via direct `transform.position +=` — Unity physics does not ru
 - **Ship vs ship**: `PushOutOfShip()` in each ship script. Combined minimum distance = 12 units (6 per ship).
 - Island base `CapsuleCollider` is kept (not destroyed) so torpedoes physically collide with them. Tree and grass-top colliders are destroyed.
 
+### Levels System
+
+Two levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key.
+
+- **Level 1** — open water: all 6 islands are parented under an `IslandsRoot` GameObject. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `CurrentLevel == 1`. This runs before any `Start()`, so `FindObjectsOfType<IslandData>()` in ship scripts returns an empty array — island collision is a no-op.
+- **Level 2** — existing map: `IslandsRoot` stays active; islands behave as before.
+- **Progression**: `GameManager.BotDefeated()` advances `"CurrentLevel"` from 1 → 2 on a win (capped at 2). Loss never changes the level. "Play Again" reloads the scene and picks up the updated level.
+- **UI**: A `"LEVEL: X"` text (black, 30pt) sits below the coin counter (top-left, anchoredPosition `(20, -75)`) on both the MainMenu canvas (`MainMenu.levelText`) and the GameScene HUD (`GameManager.levelText`). MainMenu sets it in `Start()`; GameManager sets it in `Start()`.
+- **Coin text color**: yellow (`Color.yellow`) on both canvases. **Level text color**: black (`Color.black`).
+
 ### Adding New Islands
-Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int treeCount, mats)`. Each island root gets an `IslandData` component (runtime data) and the `"Island"` tag. To add an island: add a `CreateIsland(...)` call in `BuildGameScene()` — no other changes needed.
+Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int treeCount, mats, Transform parent = null)`. Each island root gets an `IslandData` component (runtime data) and the `"Island"` tag. All calls in `BuildGameScene()` pass `islandsRootGO.transform` as the parent so the levels system can toggle them. To add an island: add a `CreateIsland(...)` call in `BuildGameScene()` with `islandsRootGO.transform` as the parent — no other changes needed.
 
 ### Rendering
 Two URP quality tiers:

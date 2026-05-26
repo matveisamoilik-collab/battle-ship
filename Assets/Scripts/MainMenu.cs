@@ -5,6 +5,7 @@ using UnityEngine.UI;
 public class MainMenu : MonoBehaviour
 {
     public Text coinsText;
+    public Text levelText;
 
     public GameObject shopPanel;
     public GameObject toBuyContent;
@@ -34,6 +35,8 @@ public class MainMenu : MonoBehaviour
     void Start()
     {
         RefreshShopUI();
+        if (levelText != null)
+            levelText.text = "LEVEL: " + PlayerPrefs.GetInt("CurrentLevel", 1);
     }
 
     public void OnPlayClicked()
