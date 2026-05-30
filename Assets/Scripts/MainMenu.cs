@@ -198,6 +198,18 @@ public class MainMenu : MonoBehaviour
             return;
         }
 
+        if (code == "resetl")
+        {
+            PlayerPrefs.SetInt("CurrentLevel", 1);
+            PlayerPrefs.Save();
+            promoCodeInput.text     = "";
+            promoFeedbackText.color = Color.cyan;
+            promoFeedbackText.text  = "Level reset to 1.";
+            if (levelText != null)
+                levelText.text = "LEVEL: 1";
+            return;
+        }
+
         bool isValid = System.Array.IndexOf(s_validPromoCodes, code) >= 0;
         if (!isValid)
         {

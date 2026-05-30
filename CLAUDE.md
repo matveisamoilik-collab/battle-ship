@@ -66,6 +66,7 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 
 - **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
 - **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts `PromoCodeReward` coins and clears the PlayerPrefs flag for each redeemed code, then if `pizza1` was reset also clears `"YellowRedShipOwned"` and reverts `"SelectedShip"` to `"blue"` if needed. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
+- **`resetl` special code**: not in `s_validPromoCodes`; handled in `OnRedeemPromoCode()` before the valid-code check. Sets `"CurrentLevel"` to 1 and immediately updates `MainMenu.levelText` to "LEVEL: 1" so the top-right HUD reflects the reset without a scene reload. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **Future-proofing**: add new codes to `s_validPromoCodes` and `resett` covers them automatically. If a new code unlocks a ship, add the ship-revocation logic to the `pizza1WasReset`-style check in the `resett` block.
 
 **Ship card pattern in Bought tab:**
