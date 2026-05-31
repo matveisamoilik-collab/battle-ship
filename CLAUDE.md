@@ -17,8 +17,8 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"YellowShipOwned"` | int | 0 | 1 = yellow ship purchased |
 | `"YellowRedShipOwned"` | int | 0 | 1 = yellow-red ship unlocked via `pizza1` |
 | `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, or `"yellowred"` |
-| `"Promo_pizza1"` | int | 0 | 1 = promo code already redeemed |
-| `"CurrentLevel"` | int | 1 | Highest unlocked level: 1 (open water), 2 (islands), or 3 (Skull Shoals) |
+| `"Promo_pizza1"` … `"Promo_pizza8"` | int | 0 | 1 = promo code already redeemed |
+| `"CurrentLevel"` | int | 1 | Highest unlocked level: 1 (open water) or 2 (islands) |
 
 ## Development Workflow
 
@@ -48,7 +48,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 - `Assets/Scripts/Editor/GameSetup.cs` — editor-only tool; run via `ShipButtlr > Build All`
 - `Assets/Scenes/MainMenu.unity` / `Assets/Scenes/GameScene.unity` — the two scenes in build order
 - `Assets/Prefabs/` — `Torpedo.prefab`, `ExplosionEffect.prefab` (created by Build All)
-- `Assets/Materials/` — URP Lit materials (created by Build All); includes Water, Sand, Grass, TreeTrunk, TreeLeaves, Skybox, Player, Bot, Torpedo, Bone, SkullDark, Volcanic, Stone
+- `Assets/Materials/` — URP Lit materials (created by Build All); includes Water, Sand, Grass, TreeTrunk, TreeLeaves, Skybox, Player, Bot, Torpedo
 - `Assets/Settings/` — URP render pipeline assets; PC and Mobile variants (`PC_RPAsset`, `Mobile_RPAsset`)
 
 ### Scene Flow
@@ -62,7 +62,7 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 - **To Buy** — shows ship cards for purchasable unowned ships (top area), plus a **Promo Code section** at the bottom (anchors 0.02–0.98 × 0.02–0.50 within ToBuyContent). The promo section has a label, a legacy `InputField`, a REDEEM button, and a feedback `Text`.
 - **Bought** — shows all owned ships. Blue ship is always present. Each purchasable ship's card has: SELECT button + SELL button (both hidden when that ship is selected; replaced by "✓ SELECTED" label). Selling is blocked on the currently selected ship.
 
-**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are defined in the static array `MainMenu.s_validPromoCodes` (`pizza1` only). Each grants +5 coins once; used codes are tracked in PlayerPrefs (`"Promo_<code>"`). Feedback: green on success, orange for already-used, red for invalid.
+**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are defined in the static array `MainMenu.s_validPromoCodes` (`pizza1`–`pizza8`). Each grants +5 coins once; used codes are tracked in PlayerPrefs (`"Promo_<code>"`). Feedback: green on success, orange for already-used, red for invalid.
 
 - **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
 - **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts `PromoCodeReward` coins and clears the PlayerPrefs flag for each redeemed code, then if `pizza1` was reset also clears `"YellowRedShipOwned"` and reverts `"SelectedShip"` to `"blue"` if needed. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
@@ -160,29 +160,23 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 - **Gameplay area**: Ships soft-clamped to ±95 on X and Z; Y always forced to 0
 - **Walls**: Invisible `BoxCollider`-only at ±105 — catch torpedoes and other physics objects
 - **Sky**: Procedural skybox (`Skybox/Procedural` shader) with sun disk wired to the directional light via `RenderSettings.sun`
-- **Level 2 islands**: 6 decorative islands (`CreateIsland()`), each a flat sandy base + grass top cylinder with 2–3 procedural trees. Positions ±42–80 units from center. Layout deterministic (seeded `System.Random`). Parented under `IslandsRoot`.
-- **Level 3 — Skull Shoals**: one skull island + 6 stone rocks. Parented under `Islands3Root`.
-  - **Skull island** (`CreateSkullIsland()`): two volcanic cylinders (base scale `radius×1.6`, top scale `radius×1.3`); `IslandData.radius = islandRadius × 0.8 = 38.4` (matches visible disk edge, no sand ring). Skull geometry (all colliders removed): cranium sphere `(22,17,20)`, brow-ridge cube, two eye-socket spheres `(6,6,6)`, nose sphere, jaw sphere `(18,5.5,10)`, four tooth cubes — all facing −Z toward player spawn.
-  - **Stone rocks** (`CreateRock()`): 6 boulders at 71 units from center (angles 30/90/150/210/270/330°). Each is a non-uniformly scaled sphere (widthX/Z 85–115% of `2×radius`, height 100–180% of radius; radius 2.5–4.5, seeded by angle). Root positioned at `Y = −height × 0.25` so 25% is submerged, 75% protrudes. 50% chance of a smaller accent chunk on top. Material: Stone (gray). `IslandData.radius = (widthX + widthZ) × 0.25`.
+- **Islands**: 6 decorative islands (flat cylinders, sandy base + green top) placed at ±42–80 units from center, each with 2–3 procedural trees (cylinder trunk + sphere canopy). Island positions and tree layout are deterministic (seeded `System.Random`).
 
 ### Collision System (No Rigidbody on Ships)
 Both ships move via direct `transform.position +=` — Unity physics does not run on them. Collision is resolved in code each frame after the position update:
 
 - **Ship vs island**: `PushOutOfIslands()` in each ship script. Reads `IslandData[]` (found in `Start()`). Circle-vs-circle in XZ: `shipRadius = 6f` (hull half-length), pushes ship center to `islandRadius + 6` from island center.
 - **Ship vs ship**: `PushOutOfShip()` in each ship script. Combined minimum distance = 12 units (6 per ship).
-- Level 2 island base `CapsuleCollider` is kept so torpedoes physically collide with them. Tree and grass-top colliders are destroyed.
-- Level 3 skull island base `CapsuleCollider` is kept for torpedo hits. All skull decoration pieces have their colliders removed.
-- Level 3 stone rocks keep the main-boulder `SphereCollider` for torpedo hits. Accent-chunk colliders are removed. The rock root is tagged `"Island"` so `collision.transform.root` lookups work correctly.
+- Island base `CapsuleCollider` is kept (not destroyed) so torpedoes physically collide with them. Tree and grass-top colliders are destroyed.
 
 ### Levels System
 
 Two levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key (highest unlocked level — never decreases).
 
-- **Level 1** — open water: `IslandsRoot` and `Islands3Root` are both inactive. `FindObjectsOfType<IslandData>()` returns empty — collision is a no-op.
-- **Level 2** — six scattered islands: `IslandsRoot` active, `Islands3Root` inactive.
-- **Level 3** — Skull Shoals: `Islands3Root` active (skull island at center with `IslandData.radius = 38.4` + 6 stone rocks at 71 units, each with varied radius 2.5–4.5), `IslandsRoot` inactive. `GameManager` holds both `islandsRoot` and `islands3Root` public fields; `Awake()` sets each via `SetActive(playingLevel == N)`.
-- **Progression**: `GameManager.BotDefeated()` advances `"CurrentLevel"` by 1 each win (capped at 3). Loss never changes the level.
-- **Play Again after win**: advances to `playingLevel + 1` (capped at 3). Play Again after loss replays the same level.
+- **Level 1** — open water: all 6 islands are parented under an `IslandsRoot` GameObject. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. This runs before any `Start()`, so `FindObjectsOfType<IslandData>()` in ship scripts returns an empty array — island collision is a no-op.
+- **Level 2** — existing map: `IslandsRoot` stays active; islands behave as before.
+- **Progression**: `GameManager.BotDefeated()` advances `"CurrentLevel"` from 1 → 2 on a win (capped at 2, reads PlayerPrefs). Loss never changes the level.
+- **Play Again after win**: advances to `playingLevel + 1` (capped at 2). Play Again after loss replays the same level.
 - **UI**: A `"LEVEL: X"` text (black, 30pt) sits below the coin counter (top-left, anchoredPosition `(20, -75)`) on both the MainMenu canvas (`MainMenu.levelText`) and the GameScene HUD (`GameManager.levelText`). GameManager sets it from `playingLevel` in `Start()`.
 - **Coin text color**: yellow (`Color.yellow`) on both canvases. **Level text color**: black (`Color.black`).
 
@@ -192,12 +186,11 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 
 **Map images** live in `Assets/Resources/` (copied from `images/` at project root by `GameSetup.CopyMapImages()` during Build All, imported as Sprites):
 - `Level_1.png` — Coral Cove bright, rest dim. Shown when `CurrentLevel == 1`.
-- `Level_2.png` — Coral Cove + Pirate's Rest bright. Shown when `CurrentLevel == 2`.
-- `Level_3.png` — Coral Cove + Pirate's Rest + Skull Shoals bright. Shown when `CurrentLevel >= 3`.
+- `Level_2.png` — Coral Cove + Pirate's Rest bright. Shown when `CurrentLevel >= 2`.
 
 **Runtime flow** (`MainMenu.cs`):
-- `OnMapClicked()` → calls `RefreshMapImage()` (loads correct sprite via `Resources.Load<Sprite>()`) → sets `island2Button.interactable` (CurrentLevel ≥ 2) and `island3Button.interactable` (CurrentLevel ≥ 3) → shows panel.
-- `OnIsland1Clicked()` / `OnIsland2Clicked()` / `OnIsland3Clicked()` → sets `MainMenu.levelToPlay = 1, 2, or 3` → loads GameScene.
+- `OnMapClicked()` → calls `RefreshMapImage()` (loads correct sprite via `Resources.Load<Sprite>()`) → sets `island2Button.interactable` based on `CurrentLevel` → shows panel.
+- `OnIsland1Clicked()` / `OnIsland2Clicked()` → sets `MainMenu.levelToPlay = 1 or 2` → loads GameScene.
 - `OnCloseMapClicked()` → hides panel.
 
 **`MainMenu.levelToPlay` static override** (session-only, not persisted):
@@ -212,9 +205,8 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 - `private bool wonLastGame` — set true in `BotDefeated()`, false by default. Used in `PlayAgain()` to decide whether to advance.
 
 **Map panel structure** (built by `GameSetup.BuildMapPanel()`):
-- `MapPanel` (full-screen, dark overlay) → `MapImage` (fills panel, sprite swapped at runtime) + `Island1Button` + `Island2Button` + `Island3Button` (transparent hit areas) + `CloseButton` (top-right "X").
+- `MapPanel` (full-screen, dark overlay) → `MapImage` (fills panel, sprite swapped at runtime) + `Island1Button` + `Island2Button` (transparent hit areas) + `CloseButton` (top-right "X").
 - Island button anchors are estimated from image pixel positions — may need tuning if positions feel off.
-- `island3Button.interactable` is set in `OnMapClicked()` based on `CurrentLevel >= 3`.
 
 **4-button MainMenu layout** (anchor Y bands):
 - PLAY: 0.56–0.65 | MAP: 0.44–0.53 | SHOP: 0.32–0.41 | QUIT: 0.20–0.29

@@ -96,10 +96,6 @@ public static class GameSetup
         dict["Grass"]      = MakeMat("GrassMaterial",      new Color(0.25f, 0.55f, 0.20f));
         dict["TreeTrunk"]  = MakeMat("TreeTrunkMaterial",  new Color(0.45f, 0.28f, 0.10f));
         dict["TreeLeaves"] = MakeMat("TreeLeavesMaterial", new Color(0.15f, 0.45f, 0.15f));
-        dict["Bone"]       = MakeMat("BoneMaterial",       new Color(0.90f, 0.86f, 0.72f));
-        dict["SkullDark"]  = MakeMat("SkullDarkMaterial",  new Color(0.08f, 0.08f, 0.08f));
-        dict["Volcanic"]   = MakeMat("VolcanicMaterial",   new Color(0.18f, 0.12f, 0.10f));
-        dict["Stone"]      = MakeMat("StoneMaterial",      new Color(0.38f, 0.38f, 0.40f));
         return dict;
     }
 
@@ -230,7 +226,7 @@ public static class GameSetup
         string srcDir = System.IO.Path.Combine(projectRoot, "images");
         string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3" })
+        foreach (string lvl in new[] { "Level_1", "Level_2" })
         {
             string src = System.IO.Path.Combine(srcDir, lvl + ".png");
             string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
@@ -242,7 +238,7 @@ public static class GameSetup
 
         AssetDatabase.Refresh();
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3" })
+        foreach (string lvl in new[] { "Level_1", "Level_2" })
         {
             string assetPath = "Assets/Resources/" + lvl + ".png";
             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -453,18 +449,6 @@ public static class GameSetup
         CreateIsland(new Vector3( 42f, 0f,  82f),  7f, 2, mats, islandsRootGO.transform);
         CreateIsland(new Vector3(-45f, 0f, -80f), 11f, 3, mats, islandsRootGO.transform);
 
-        // Level 3: Skull Shoals — one massive central island with skull + 6 rock sentinels
-        var islands3RootGO = new GameObject("Islands3Root");
-        CreateSkullIsland(Vector3.zero, 48f, mats, islands3RootGO.transform);
-        float[] rockAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
-        foreach (float angle in rockAngles)
-        {
-            float rad = angle * Mathf.Deg2Rad;
-            var rockPos = new Vector3(Mathf.Sin(rad) * 71f, 0f, Mathf.Cos(rad) * 71f);
-            var rockRng = new System.Random((int)(angle * 137 + 42));
-            CreateRock(rockPos, rockRng, mats, islands3RootGO.transform);
-        }
-
         // Invisible boundary walls (BoxCollider only, tagged "Wall")
         CreateWall("Wall_PosX", new Vector3(105f,  5f, 0f),   new Vector3(10f, 10f, 210f));
         CreateWall("Wall_NegX", new Vector3(-105f, 5f, 0f),   new Vector3(10f, 10f, 210f));
@@ -570,8 +554,7 @@ public static class GameSetup
         coinRT.sizeDelta        = new Vector2(300f, 50f);
         coinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
         gm.coinsText   = coinGO.GetComponent<Text>();
-        gm.islandsRoot  = islandsRootGO;
-        gm.islands3Root = islands3RootGO;
+        gm.islandsRoot = islandsRootGO;
 
         // Level display — below coins, top-left HUD
         var levelGO = MakeText("LevelText", hudGO.transform, "LEVEL: 1", 30, Color.black);
@@ -712,150 +695,6 @@ public static class GameSetup
             float tx    = Mathf.Cos(angle * Mathf.Deg2Rad) * dist;
             float tz    = Mathf.Sin(angle * Mathf.Deg2Rad) * dist;
             CreateTree(new Vector3(pos.x + tx, 0.43f, pos.z + tz), island, mats);
-        }
-    }
-
-    static void CreateSkullIsland(Vector3 pos, float islandRadius,
-        System.Collections.Generic.Dictionary<string, Material> mats,
-        Transform parent = null)
-    {
-        var island = new GameObject("Island");
-        if (parent != null) island.transform.SetParent(parent);
-        island.transform.position = pos;
-        island.tag = "Island";
-        // Hitbox matches the visible volcanic disk (0.8× full radius), not a wider sand ring.
-        island.AddComponent<IslandData>().radius = islandRadius * 0.8f;
-
-        // Volcanic base — same visual radius as IslandData.radius; CapsuleCollider kept for torpedoes.
-        var baseGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        baseGO.name = "IslandBase";
-        baseGO.transform.SetParent(island.transform);
-        baseGO.transform.localPosition = new Vector3(0f, 0.15f, 0f);
-        baseGO.transform.localScale    = new Vector3(islandRadius * 1.6f, 0.15f, islandRadius * 1.6f);
-        baseGO.GetComponent<MeshRenderer>().sharedMaterial = mats["Volcanic"];
-
-        // Slightly smaller raised dark cap for visual depth.
-        var topGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        topGO.name = "IslandTop";
-        topGO.transform.SetParent(island.transform);
-        topGO.transform.localPosition = new Vector3(0f, 0.35f, 0f);
-        topGO.transform.localScale    = new Vector3(islandRadius * 1.3f, 0.08f, islandRadius * 1.3f);
-        topGO.GetComponent<MeshRenderer>().sharedMaterial = mats["Volcanic"];
-        Object.DestroyImmediate(topGO.GetComponent<Collider>());
-
-        // ── SKULL ──────────────────────────────────────────────────────────────
-        // All pieces face -Z (toward player spawn). Island is at world origin.
-        // Unity Sphere: radius 0.5 at scale 1. Cranium radius ~10 → scale 20.
-
-        // Cranium — wider in X, slightly flattened Y for realistic skull proportion
-        var cranium = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        cranium.name = "SkullCranium";
-        cranium.transform.SetParent(island.transform);
-        cranium.transform.position   = new Vector3(0f, 10.43f, 0f);
-        cranium.transform.localScale = new Vector3(22f, 17f, 20f);
-        cranium.GetComponent<MeshRenderer>().sharedMaterial = mats["Bone"];
-        Object.DestroyImmediate(cranium.GetComponent<Collider>());
-
-        // Brow ridge — flat horizontal bar above eye sockets
-        var brow = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        brow.name = "SkullBrow";
-        brow.transform.SetParent(island.transform);
-        brow.transform.position   = new Vector3(0f, 13.5f, -7.5f);
-        brow.transform.localScale = new Vector3(16f, 1.5f, 3.5f);
-        brow.GetComponent<MeshRenderer>().sharedMaterial = mats["Bone"];
-        Object.DestroyImmediate(brow.GetComponent<Collider>());
-
-        // Eye sockets — larger, pushed slightly more forward (-Z)
-        var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        leftEye.name = "SkullLeftEye";
-        leftEye.transform.SetParent(island.transform);
-        leftEye.transform.position   = new Vector3(3.5f, 12.2f, -8.5f);
-        leftEye.transform.localScale = new Vector3(6f, 6f, 6f);
-        leftEye.GetComponent<MeshRenderer>().sharedMaterial = mats["SkullDark"];
-        Object.DestroyImmediate(leftEye.GetComponent<Collider>());
-
-        var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        rightEye.name = "SkullRightEye";
-        rightEye.transform.SetParent(island.transform);
-        rightEye.transform.position   = new Vector3(-3.5f, 12.2f, -8.5f);
-        rightEye.transform.localScale = new Vector3(6f, 6f, 6f);
-        rightEye.GetComponent<MeshRenderer>().sharedMaterial = mats["SkullDark"];
-        Object.DestroyImmediate(rightEye.GetComponent<Collider>());
-
-        // Nose cavity
-        var nose = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        nose.name = "SkullNose";
-        nose.transform.SetParent(island.transform);
-        nose.transform.position   = new Vector3(0f, 9.8f, -9.8f);
-        nose.transform.localScale = new Vector3(3.5f, 4f, 3f);
-        nose.GetComponent<MeshRenderer>().sharedMaterial = mats["SkullDark"];
-        Object.DestroyImmediate(nose.GetComponent<Collider>());
-
-        // Jaw / mandible — wide ellipsoid below cranium
-        var jaw = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        jaw.name = "SkullJaw";
-        jaw.transform.SetParent(island.transform);
-        jaw.transform.position   = new Vector3(0f, 5.0f, -3.0f);
-        jaw.transform.localScale = new Vector3(18f, 5.5f, 10f);
-        jaw.GetComponent<MeshRenderer>().sharedMaterial = mats["Bone"];
-        Object.DestroyImmediate(jaw.GetComponent<Collider>());
-
-        // Teeth — 4 cubes evenly spaced at the front of the jaw
-        float[] toothX = { -4.5f, -1.5f, 1.5f, 4.5f };
-        foreach (float tx in toothX)
-        {
-            var tooth = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            tooth.name = "SkullTooth";
-            tooth.transform.SetParent(island.transform);
-            tooth.transform.position   = new Vector3(tx, 7.5f, -7.5f);
-            tooth.transform.localScale = new Vector3(2f, 3.5f, 2f);
-            tooth.GetComponent<MeshRenderer>().sharedMaterial = mats["Bone"];
-            Object.DestroyImmediate(tooth.GetComponent<Collider>());
-        }
-    }
-
-    static void CreateRock(Vector3 pos, System.Random rng,
-        System.Collections.Generic.Dictionary<string, Material> mats,
-        Transform parent = null)
-    {
-        float radius = 2.5f + (float)rng.NextDouble() * 2.0f;
-        float widthX = radius * 2f * (0.85f + (float)rng.NextDouble() * 0.30f);
-        float widthZ = radius * 2f * (0.85f + (float)rng.NextDouble() * 0.30f);
-        float height = radius * (1.0f  + (float)rng.NextDouble() * 0.80f);
-        float yRot   = (float)rng.NextDouble() * 360f;
-
-        var rock = new GameObject("Rock");
-        if (parent != null) rock.transform.SetParent(parent);
-        // Sink root 25% below water so boulder emerges from the sea rather than sitting on top.
-        rock.transform.position = new Vector3(pos.x, -height * 0.25f, pos.z);
-        rock.tag = "Island";
-        rock.AddComponent<IslandData>().radius = (widthX + widthZ) * 0.25f;
-
-        // Main boulder — non-uniform sphere gives irregular stone silhouette.
-        // SphereCollider kept so torpedoes register hits (root tagged "Island").
-        var body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        body.name = "RockBody";
-        body.transform.SetParent(rock.transform);
-        body.transform.localPosition    = new Vector3(0f, height * 0.5f, 0f);
-        body.transform.localScale       = new Vector3(widthX, height, widthZ);
-        body.transform.localEulerAngles = new Vector3(0f, yRot, 0f);
-        body.GetComponent<MeshRenderer>().sharedMaterial = mats["Stone"];
-
-        // 50% chance: smaller accent chunk perched on top for a craggy look
-        if (rng.NextDouble() > 0.5)
-        {
-            float cw = widthX * (0.4f + (float)rng.NextDouble() * 0.25f);
-            float ch = height  * (0.45f + (float)rng.NextDouble() * 0.25f);
-            float ox = (float)(rng.NextDouble() - 0.5) * radius * 0.6f;
-            float oz = (float)(rng.NextDouble() - 0.5) * radius * 0.6f;
-
-            var chunk = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            chunk.name = "RockChunk";
-            chunk.transform.SetParent(rock.transform);
-            chunk.transform.localPosition = new Vector3(ox, height * 0.85f + ch * 0.4f, oz);
-            chunk.transform.localScale    = new Vector3(cw, ch, cw * (0.8f + (float)rng.NextDouble() * 0.4f));
-            chunk.GetComponent<MeshRenderer>().sharedMaterial = mats["Stone"];
-            Object.DestroyImmediate(chunk.GetComponent<Collider>());
         }
     }
 
@@ -1113,17 +952,6 @@ public static class GameSetup
         isle2RT.offsetMin = Vector2.zero;
         isle2RT.offsetMax = Vector2.zero;
 
-        // Island 3 — Skull Shoals (locked until CurrentLevel >= 3)
-        var isle3GO = new GameObject("Island3Button");
-        isle3GO.transform.SetParent(panel.transform, false);
-        isle3GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
-        var isle3Btn = isle3GO.AddComponent<Button>();
-        var isle3RT  = isle3GO.GetComponent<RectTransform>();
-        isle3RT.anchorMin = new Vector2(0.23f, 0.15f);
-        isle3RT.anchorMax = new Vector2(0.39f, 0.31f);
-        isle3RT.offsetMin = Vector2.zero;
-        isle3RT.offsetMax = Vector2.zero;
-
         // Close button — top-right corner
         var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
         var closeRT    = closeBtnGO.GetComponent<RectTransform>();
@@ -1136,12 +964,10 @@ public static class GameSetup
         script.mapPanel      = panel;
         script.mapImage      = mapImg;
         script.island2Button = isle2Btn;
-        script.island3Button = isle3Btn;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
         UnityEventTools.AddPersistentListener(isle2Btn.onClick, script.OnIsland2Clicked);
-        UnityEventTools.AddPersistentListener(isle3Btn.onClick, script.OnIsland3Clicked);
         UnityEventTools.AddPersistentListener(
             closeBtnGO.GetComponent<Button>().onClick,
             script.OnCloseMapClicked);
