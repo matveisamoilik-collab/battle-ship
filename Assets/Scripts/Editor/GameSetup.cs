@@ -530,11 +530,11 @@ public static class GameSetup
         camGO.tag = "MainCamera";
         camGO.AddComponent<Camera>().clearFlags = CameraClearFlags.Skybox;
         camGO.AddComponent<AudioListener>();
-        camGO.transform.position = new Vector3(0f, 8f, -75f);  // behind player on Z axis
+        camGO.transform.position = new Vector3(0f, 8.8f, -78f); // matches CameraFollow desired at start: player(0,0,-60) - forward*18 + up*8.8
         var cameraFollow = camGO.AddComponent<CameraFollow>();
         cameraFollow.target   = playerShipGO.transform;
-        cameraFollow.distance = 18f;   // 15 * 1.2 — 20% farther
-        cameraFollow.height   = 8.8f;  // 8 * 1.1 — 10% higher
+        cameraFollow.distance = 21.6f;  // 20% farther than previous 18
+        cameraFollow.height   = 8.8f;
 
         // ----- HUD Canvas -----
         var hudGO    = new GameObject("HUDCanvas");

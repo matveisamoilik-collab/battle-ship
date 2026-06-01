@@ -4,11 +4,18 @@ using UnityEngine;
 public class CameraFollow : MonoBehaviour
 {
     public Transform target;
-    public float distance = 15f;
-    public float height = 8f;
+    public float distance = 21.6f;
+    public float height = 8.8f;
     public float smoothSpeed = 5f;
 
     private Vector3 shakeOffset;
+
+    void Start()
+    {
+        if (target == null) return;
+        transform.position = target.position - target.forward * distance + Vector3.up * height;
+        transform.LookAt(target.position + Vector3.up * 1f);
+    }
 
     void LateUpdate()
     {
