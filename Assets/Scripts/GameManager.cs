@@ -20,6 +20,7 @@ public class GameManager : MonoBehaviour
 
     [Header("Level")]
     public GameObject islandsRoot;
+    public GameObject islands3Root;
     public Text levelText;
 
     private bool gameOver = false;
@@ -41,8 +42,8 @@ public class GameManager : MonoBehaviour
             : PlayerPrefs.GetInt("CurrentLevel", 1);
         MainMenu.levelToPlay = -1;
 
-        if (playingLevel == 1 && islandsRoot != null)
-            islandsRoot.SetActive(false);
+        if (islandsRoot  != null) islandsRoot.SetActive(playingLevel == 2);
+        if (islands3Root != null) islands3Root.SetActive(playingLevel == 3);
     }
 
     void Start()
@@ -75,9 +76,10 @@ public class GameManager : MonoBehaviour
         CoinManager.Instance?.AddCoins(20);
         UpdateCoinsText();
 
-        if (PlayerPrefs.GetInt("CurrentLevel", 1) < 2)
+        int stored = PlayerPrefs.GetInt("CurrentLevel", 1);
+        if (stored < playingLevel + 1 && stored < 3)
         {
-            PlayerPrefs.SetInt("CurrentLevel", 2);
+            PlayerPrefs.SetInt("CurrentLevel", playingLevel + 1);
             PlayerPrefs.Save();
         }
 
@@ -101,7 +103,7 @@ public class GameManager : MonoBehaviour
     public void PlayAgain()
     {
         Time.timeScale = 1f;
-        MainMenu.levelToPlay = wonLastGame && playingLevel < 2 ? playingLevel + 1 : playingLevel;
+        MainMenu.levelToPlay = wonLastGame && playingLevel < 3 ? playingLevel + 1 : playingLevel;
         SceneManager.LoadScene("GameScene");
     }
 

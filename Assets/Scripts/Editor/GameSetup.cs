@@ -23,6 +23,7 @@ public static class GameSetup
         EnsureTags();
         CreateFolders();
         CopyMapImages();
+        CopyModels();
 
         var mats = CreateMaterials();
         var explosionPrefab = CreateExplosionPrefab();
@@ -72,6 +73,9 @@ public static class GameSetup
         EnsureFolder("Assets/Scripts", "Editor");
         EnsureFolder("Assets", "Materials");
         EnsureFolder("Assets", "Prefabs");
+        EnsureFolder("Assets", "Resources");
+        EnsureFolder("Assets", "Models");
+        EnsureFolder("Assets/Models", "IslandWithSkull");
     }
 
     static void EnsureFolder(string parent, string child)
@@ -96,6 +100,8 @@ public static class GameSetup
         dict["Grass"]      = MakeMat("GrassMaterial",      new Color(0.25f, 0.55f, 0.20f));
         dict["TreeTrunk"]  = MakeMat("TreeTrunkMaterial",  new Color(0.45f, 0.28f, 0.10f));
         dict["TreeLeaves"] = MakeMat("TreeLeavesMaterial", new Color(0.15f, 0.45f, 0.15f));
+        dict["Volcanic"]   = MakeMat("VolcanicMaterial",   new Color(0.18f, 0.12f, 0.10f));
+        dict["Stone"]      = MakeMat("StoneMaterial",      new Color(0.38f, 0.38f, 0.40f));
         return dict;
     }
 
@@ -226,7 +232,7 @@ public static class GameSetup
         string srcDir = System.IO.Path.Combine(projectRoot, "images");
         string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
 
-        foreach (string lvl in new[] { "Level_1", "Level_2" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3" })
         {
             string src = System.IO.Path.Combine(srcDir, lvl + ".png");
             string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
@@ -238,7 +244,7 @@ public static class GameSetup
 
         AssetDatabase.Refresh();
 
-        foreach (string lvl in new[] { "Level_1", "Level_2" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3" })
         {
             string assetPath = "Assets/Resources/" + lvl + ".png";
             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -247,6 +253,37 @@ public static class GameSetup
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.mipmapEnabled    = false;
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 6b. Copy 3D models into Assets/Models
+    // -------------------------------------------------------------------------
+
+    static void CopyModels()
+    {
+        string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+        string src        = System.IO.Path.Combine(projectRoot, "3d", "island", "islandWithSkull.fbx");
+        string assetPath  = "Assets/Models/IslandWithSkull/islandWithSkull.fbx";
+        string dst        = System.IO.Path.Combine(Application.dataPath, "Models", "IslandWithSkull", "islandWithSkull.fbx");
+
+        if (!System.IO.File.Exists(src))
+        {
+            Debug.LogWarning("[ShipButtlr] islandWithSkull.fbx not found at: " + src);
+            return;
+        }
+
+        System.IO.File.Copy(src, dst, overwrite: true);
+        AssetDatabase.Refresh();
+
+        // Configure importer: extract embedded textures + create external URP-compatible materials
+        var importer = AssetImporter.GetAtPath(assetPath) as ModelImporter;
+        if (importer != null)
+        {
+            importer.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
+            importer.materialLocation   = ModelImporterMaterialLocation.External;
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            Debug.Log("[ShipButtlr] islandWithSkull.fbx imported with external materials.");
         }
     }
 
@@ -449,6 +486,18 @@ public static class GameSetup
         CreateIsland(new Vector3( 42f, 0f,  82f),  7f, 2, mats, islandsRootGO.transform);
         CreateIsland(new Vector3(-45f, 0f, -80f), 11f, 3, mats, islandsRootGO.transform);
 
+        // Level 3: Skull Shoals — one massive central island with skull model + 6 rock sentinels
+        var islands3RootGO = new GameObject("Islands3Root");
+        CreateSkullIsland(Vector3.zero, 33.6f, mats, islands3RootGO.transform);
+        float[] rockAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
+        foreach (float angle in rockAngles)
+        {
+            float rad    = angle * Mathf.Deg2Rad;
+            var rockPos  = new Vector3(Mathf.Sin(rad) * 71f, 0f, Mathf.Cos(rad) * 71f);
+            var rockRng  = new System.Random((int)(angle * 137 + 42));
+            CreateRock(rockPos, rockRng, mats, islands3RootGO.transform);
+        }
+
         // Invisible boundary walls (BoxCollider only, tagged "Wall")
         CreateWall("Wall_PosX", new Vector3(105f,  5f, 0f),   new Vector3(10f, 10f, 210f));
         CreateWall("Wall_NegX", new Vector3(-105f, 5f, 0f),   new Vector3(10f, 10f, 210f));
@@ -483,7 +532,9 @@ public static class GameSetup
         camGO.AddComponent<AudioListener>();
         camGO.transform.position = new Vector3(0f, 8f, -75f);  // behind player on Z axis
         var cameraFollow = camGO.AddComponent<CameraFollow>();
-        cameraFollow.target = playerShipGO.transform;
+        cameraFollow.target   = playerShipGO.transform;
+        cameraFollow.distance = 18f;   // 15 * 1.2 — 20% farther
+        cameraFollow.height   = 8.8f;  // 8 * 1.1 — 10% higher
 
         // ----- HUD Canvas -----
         var hudGO    = new GameObject("HUDCanvas");
@@ -553,8 +604,9 @@ public static class GameSetup
         coinRT.anchoredPosition = new Vector2(20f, -20f);
         coinRT.sizeDelta        = new Vector2(300f, 50f);
         coinGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
-        gm.coinsText   = coinGO.GetComponent<Text>();
-        gm.islandsRoot = islandsRootGO;
+        gm.coinsText    = coinGO.GetComponent<Text>();
+        gm.islandsRoot  = islandsRootGO;
+        gm.islands3Root = islands3RootGO;
 
         // Level display — below coins, top-left HUD
         var levelGO = MakeText("LevelText", hudGO.transform, "LEVEL: 1", 30, Color.black);
@@ -695,6 +747,120 @@ public static class GameSetup
             float tx    = Mathf.Cos(angle * Mathf.Deg2Rad) * dist;
             float tz    = Mathf.Sin(angle * Mathf.Deg2Rad) * dist;
             CreateTree(new Vector3(pos.x + tx, 0.43f, pos.z + tz), island, mats);
+        }
+    }
+
+    static void CreateSkullIsland(Vector3 pos, float islandRadius,
+        System.Collections.Generic.Dictionary<string, Material> mats,
+        Transform parent = null)
+    {
+        var island = new GameObject("Island");
+        if (parent != null) island.transform.SetParent(parent);
+        island.transform.position = pos;
+        island.tag = "Island";
+        island.AddComponent<IslandData>().radius = islandRadius * 0.8f;
+
+        // Invisible capsule collider on the root so torpedoes still register hits
+        var cap = island.AddComponent<CapsuleCollider>();
+        cap.radius = islandRadius * 0.8f;
+        cap.height = 30f;
+        cap.center = new Vector3(0f, 15f, 0f);
+
+        // Full island FBX (base + skull built in)
+        var islandPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+            "Assets/Models/IslandWithSkull/islandWithSkull.fbx");
+        if (islandPrefab == null)
+        {
+            Debug.LogWarning("[ShipButtlr] islandWithSkull.fbx not found — run Build All again after Unity imports it.");
+            return;
+        }
+
+        var islandGO = (GameObject)PrefabUtility.InstantiatePrefab(islandPrefab);
+        islandGO.name = "IslandModel";
+
+        // Measure with final rotation applied so bounds are accurate
+        islandGO.transform.position         = Vector3.zero;
+        islandGO.transform.localEulerAngles = new Vector3(-90f, 0f, 0f); // Blender Z-up → Unity Y-up
+        islandGO.transform.localScale       = Vector3.one;
+
+        // Measure full world-space AABB by transforming every mesh corner
+        Bounds wb = new Bounds();
+        bool hasMesh = false;
+        foreach (var mf in islandGO.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf.sharedMesh == null) continue;
+            var b = mf.sharedMesh.bounds;
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                var wc = mf.transform.TransformPoint(
+                    b.center + Vector3.Scale(b.extents, new Vector3(sx, sy, sz)));
+                if (!hasMesh) { wb = new Bounds(wc, Vector3.zero); hasMesh = true; }
+                else wb.Encapsulate(wc);
+            }
+        }
+
+        // Scale XZ footprint to match the visual base diameter (islandRadius * 1.6)
+        float xzExtent = Mathf.Max(wb.size.x, wb.size.z);
+        float target   = islandRadius * 1.6f;
+        float s        = (hasMesh && xzExtent > 0.0001f) ? target / xzExtent : 1f;
+
+        // Sit the model bottom exactly at water level (y = 0 in island-local space)
+        float localY = -wb.min.y * s;
+
+        Debug.Log($"[ShipButtlr] IslandWithSkull: bounds={wb.size} xzExtent={xzExtent:F3} scale={s:F3} localY={localY:F3}");
+
+        islandGO.transform.SetParent(island.transform, false);
+        islandGO.transform.localPosition    = new Vector3(0f, localY, 0f);
+        islandGO.transform.localScale       = new Vector3(s, s, s);
+        islandGO.transform.localEulerAngles = new Vector3(-90f, 0f, 0f);
+
+        // Remove any colliders on the model — the CapsuleCollider on the root handles hits
+        foreach (var col in islandGO.GetComponentsInChildren<Collider>())
+            Object.DestroyImmediate(col);
+    }
+
+    static void CreateRock(Vector3 pos, System.Random rng,
+        System.Collections.Generic.Dictionary<string, Material> mats,
+        Transform parent = null)
+    {
+        float radius = 2.5f + (float)rng.NextDouble() * 2.0f;
+        float widthX = radius * 2f * (0.85f + (float)rng.NextDouble() * 0.30f);
+        float widthZ = radius * 2f * (0.85f + (float)rng.NextDouble() * 0.30f);
+        float height = radius * (1.0f  + (float)rng.NextDouble() * 0.80f);
+        float yRot   = (float)rng.NextDouble() * 360f;
+
+        var rock = new GameObject("Rock");
+        if (parent != null) rock.transform.SetParent(parent);
+        rock.transform.position = new Vector3(pos.x, -height * 0.25f, pos.z);
+        rock.tag = "Island";
+        rock.AddComponent<IslandData>().radius = (widthX + widthZ) * 0.25f;
+
+        // Main boulder — SphereCollider kept for torpedo hits
+        var body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        body.name = "RockBody";
+        body.transform.SetParent(rock.transform);
+        body.transform.localPosition    = new Vector3(0f, height * 0.5f, 0f);
+        body.transform.localScale       = new Vector3(widthX, height, widthZ);
+        body.transform.localEulerAngles = new Vector3(0f, yRot, 0f);
+        body.GetComponent<MeshRenderer>().sharedMaterial = mats["Stone"];
+
+        // 50% chance: smaller accent chunk on top for a craggy look
+        if (rng.NextDouble() > 0.5)
+        {
+            float cw = widthX * (0.4f + (float)rng.NextDouble() * 0.25f);
+            float ch = height  * (0.45f + (float)rng.NextDouble() * 0.25f);
+            float ox = (float)(rng.NextDouble() - 0.5) * radius * 0.6f;
+            float oz = (float)(rng.NextDouble() - 0.5) * radius * 0.6f;
+
+            var chunk = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            chunk.name = "RockChunk";
+            chunk.transform.SetParent(rock.transform);
+            chunk.transform.localPosition = new Vector3(ox, height * 0.85f + ch * 0.4f, oz);
+            chunk.transform.localScale    = new Vector3(cw, ch, cw * (0.8f + (float)rng.NextDouble() * 0.4f));
+            chunk.GetComponent<MeshRenderer>().sharedMaterial = mats["Stone"];
+            Object.DestroyImmediate(chunk.GetComponent<Collider>());
         }
     }
 
@@ -952,6 +1118,17 @@ public static class GameSetup
         isle2RT.offsetMin = Vector2.zero;
         isle2RT.offsetMax = Vector2.zero;
 
+        // Island 3 — Skull Shoals (locked until CurrentLevel >= 3)
+        var isle3GO = new GameObject("Island3Button");
+        isle3GO.transform.SetParent(panel.transform, false);
+        isle3GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+        var isle3Btn = isle3GO.AddComponent<Button>();
+        var isle3RT  = isle3GO.GetComponent<RectTransform>();
+        isle3RT.anchorMin = new Vector2(0.23f, 0.15f);
+        isle3RT.anchorMax = new Vector2(0.39f, 0.31f);
+        isle3RT.offsetMin = Vector2.zero;
+        isle3RT.offsetMax = Vector2.zero;
+
         // Close button — top-right corner
         var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
         var closeRT    = closeBtnGO.GetComponent<RectTransform>();
@@ -964,10 +1141,12 @@ public static class GameSetup
         script.mapPanel      = panel;
         script.mapImage      = mapImg;
         script.island2Button = isle2Btn;
+        script.island3Button = isle3Btn;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
         UnityEventTools.AddPersistentListener(isle2Btn.onClick, script.OnIsland2Clicked);
+        UnityEventTools.AddPersistentListener(isle3Btn.onClick, script.OnIsland3Clicked);
         UnityEventTools.AddPersistentListener(
             closeBtnGO.GetComponent<Button>().onClick,
             script.OnCloseMapClicked);
