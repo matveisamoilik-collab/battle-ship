@@ -14,7 +14,7 @@ public class CameraFollow : MonoBehaviour
     {
         if (target == null) return;
         transform.position = target.position - target.forward * distance + Vector3.up * height;
-        transform.LookAt(target.position + Vector3.up * 1f);
+        transform.LookAt(target.position + Vector3.up * 5f);
     }
 
     void LateUpdate()
@@ -31,7 +31,7 @@ public class CameraFollow : MonoBehaviour
             smoothSpeed * Time.deltaTime);
         transform.position += shakeOffset;
 
-        transform.LookAt(target.position + Vector3.up * 1f);
+        transform.LookAt(target.position + Vector3.up * 5f);
     }
 
     // Uses unscaledDeltaTime so shake still runs when Time.timeScale == 0

@@ -121,6 +121,9 @@ GameManager (non-persistent singleton, IsGameOver)
   ├── IslandData  → data component on each island root; stores radius for collision
   └── CameraFollow → Shake() coroutine (unscaledDeltaTime); shakeOffset applied
                      directly to transform.position AFTER the lerp (not inside it)
+                     → Start() snaps to correct position instantly (no lerp drift on game start)
+                     → follows player at distance=21.6, height=8.8, smoothSpeed=5
+                     → looks at target.position + Vector3.up*5 (tilted up to show sky)
 ```
 
 **GameManager** is a non-persistent singleton (not `DontDestroyOnLoad`). It sets `Time.timeScale = 0f` on game-over and restores it to `1f` on scene reload. `ShakeCamera(duration, magnitude)` is the public entry point for all camera shake — do not call `CameraFollow.Shake()` directly.
