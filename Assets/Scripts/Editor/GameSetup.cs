@@ -76,6 +76,7 @@ public static class GameSetup
         EnsureFolder("Assets", "Resources");
         EnsureFolder("Assets", "Models");
         EnsureFolder("Assets/Models", "IslandWithSkull");
+        EnsureFolder("Assets/Models", "PiratShip");
     }
 
     static void EnsureFolder(string parent, string child)
@@ -272,6 +273,26 @@ public static class GameSetup
             Debug.LogWarning("[ShipButtlr] islandWithSkull.fbx not found at: " + src);
             return;
         }
+
+        // Pirate ship model
+        string piratSrc      = System.IO.Path.Combine(projectRoot, "3d", "ship", "pirat_ship.fbx");
+        string piratAsset    = "Assets/Models/PiratShip/pirat_ship.fbx";
+        string piratDst      = System.IO.Path.Combine(Application.dataPath, "Models", "PiratShip", "pirat_ship.fbx");
+        if (System.IO.File.Exists(piratSrc))
+        {
+            System.IO.File.Copy(piratSrc, piratDst, overwrite: true);
+            AssetDatabase.Refresh();
+            var piratImporter = AssetImporter.GetAtPath(piratAsset) as ModelImporter;
+            if (piratImporter != null)
+            {
+                piratImporter.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
+                piratImporter.materialLocation   = ModelImporterMaterialLocation.External;
+                AssetDatabase.ImportAsset(piratAsset, ImportAssetOptions.ForceUpdate);
+            }
+            Debug.Log("[ShipButtlr] pirat_ship.fbx imported.");
+        }
+        else
+            Debug.LogWarning("[ShipButtlr] pirat_ship.fbx not found at: " + piratSrc);
 
         System.IO.File.Copy(src, dst, overwrite: true);
         AssetDatabase.Refresh();
@@ -522,8 +543,14 @@ public static class GameSetup
         playerShip.torpedoSpawnPoint = playerSpawn;
 
         Transform botSpawn = botShipGO.transform.Find("TorpedoSpawn");
-        botShip.torpedoPrefab    = torpedoPrefab;
+        botShip.torpedoPrefab     = torpedoPrefab;
         botShip.torpedoSpawnPoint = botSpawn;
+
+        var piratPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/PiratShip/pirat_ship.fbx");
+        if (piratPrefab != null)
+            botShip.piratShipModel = piratPrefab;
+        else
+            Debug.LogWarning("[ShipButtlr] pirat_ship.fbx not found — run Build All again after Unity imports it.");
 
         // ----- Camera -----
         var camGO = new GameObject("Main Camera");

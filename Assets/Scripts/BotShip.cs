@@ -16,6 +16,9 @@ public class BotShip : MonoBehaviour
     public float maxHP = 245f;
     public HealthBar healthBar;
 
+    [Header("Level 3 Visual")]
+    public GameObject piratShipModel;
+
     private const float MinPlayerDist = 18f; // 1.5 hull lengths — bot never crosses this
     private const float FiringArc = 10f;     // fire only when player is within this bow cone
 
@@ -37,6 +40,53 @@ public class BotShip : MonoBehaviour
 
         nextFireTime = Time.time + 2f;
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
+
+        if (GameManager.Instance != null && GameManager.Instance.PlayingLevel == 3)
+            ApplyPiratShipVisual();
+    }
+
+    void ApplyPiratShipVisual()
+    {
+        if (piratShipModel == null) return;
+
+        // Hide original box geometry — keep Hull BoxCollider for torpedo hits
+        var hull  = transform.Find("Hull");
+        var cabin = transform.Find("Cabin");
+        if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr) mr.enabled = false; }
+        if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr) mr.enabled = false; }
+
+        var model = Instantiate(piratShipModel, transform);
+        model.name = "PiratShipVisual";
+        model.transform.localPosition    = Vector3.zero;
+        model.transform.localEulerAngles = Vector3.zero;
+        model.transform.localScale       = Vector3.one;
+
+        // Measure world-space AABB
+        Bounds wb = new Bounds();
+        bool hasMesh = false;
+        foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf.sharedMesh == null) continue;
+            var b = mf.sharedMesh.bounds;
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                var wc = mf.transform.TransformPoint(
+                    b.center + Vector3.Scale(b.extents, new Vector3(sx, sy, sz)));
+                if (!hasMesh) { wb = new Bounds(wc, Vector3.zero); hasMesh = true; }
+                else wb.Encapsulate(wc);
+            }
+        }
+
+        // Scale longest XZ axis to match hull length (12 units)
+        float longest = Mathf.Max(wb.size.x, wb.size.z);
+        float s = (hasMesh && longest > 0.0001f) ? 12f / longest : 1f;
+        model.transform.localScale    = new Vector3(s, s, s);
+        model.transform.localPosition = new Vector3(0f, -wb.min.y * s, 0f);
+
+        foreach (var col in model.GetComponentsInChildren<Collider>())
+            Destroy(col);
     }
 
     void Update()

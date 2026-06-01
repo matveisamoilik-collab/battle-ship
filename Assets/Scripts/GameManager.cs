@@ -25,6 +25,7 @@ public class GameManager : MonoBehaviour
 
     private bool gameOver = false;
     public bool IsGameOver => gameOver;
+    public int  PlayingLevel => playingLevel;
     private int playingLevel;
     private bool wonLastGame;
 
