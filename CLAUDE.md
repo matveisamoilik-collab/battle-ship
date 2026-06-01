@@ -115,6 +115,8 @@ GameManager (non-persistent singleton, IsGameOver)
   │               → TryShake() → GameManager.ShakeCamera()
   ├── BotShip     → TakeDamage() → GameManager.BotDefeated()
   │               → PushOutOfIslands() / PushOutOfShip() — code-based collision
+  │               → Level 3: ApplyPiratShipVisual() hides red box hull/cabin, instantiates
+  │                 Assets/Models/PiratShip/pirat_ship.fbx scaled to 12 units (hull length)
   ├── Torpedo     → routes damage via isPlayerTorpedo flag + root tag lookup
   ├── HealthBar   → driven by SetHealth(current, max) calls from ships
   │               → scales fill RectTransform localScale.x (not fillAmount); pivot (0, 0.5)
@@ -127,6 +129,8 @@ GameManager (non-persistent singleton, IsGameOver)
 ```
 
 **GameManager** is a non-persistent singleton (not `DontDestroyOnLoad`). It sets `Time.timeScale = 0f` on game-over and restores it to `1f` on scene reload. `ShakeCamera(duration, magnitude)` is the public entry point for all camera shake — do not call `CameraFollow.Shake()` directly.
+
+**BotShip visual**: Levels 1 & 2 use a red box hull (URP Lit, `BotMaterial`). Level 3 swaps to `pirat_ship.fbx` at runtime in `Start()` — the box MeshRenderers are disabled, the FBX is instantiated as a child and auto-scaled so its longest XZ axis = 12 units (hull length). The Hull BoxCollider stays active for torpedo hits. Source FBX: `3d/ship/pirat_ship.fbx`; imported asset: `Assets/Models/PiratShip/`. `GameManager.PlayingLevel` (public getter) is used to detect level 3.
 
 **BotShip AI** has two states — `AIM` and `REPOSITION` — in a forward-only attack-run loop:
 - `AIM` (default) → rotates bow toward player (`RotateToward`), advances via `MoveForwardClamped()`, fires when player is within 10° of the bow and cooldown is ready, then transitions to `REPOSITION`.
