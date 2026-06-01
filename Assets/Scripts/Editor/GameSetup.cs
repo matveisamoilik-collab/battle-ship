@@ -780,7 +780,7 @@ public static class GameSetup
 
         // Measure with final rotation applied so bounds are accurate
         islandGO.transform.position         = Vector3.zero;
-        islandGO.transform.localEulerAngles = new Vector3(-90f, 0f, 0f); // Blender Z-up → Unity Y-up
+        islandGO.transform.localEulerAngles = new Vector3(-90f, 180f, 0f); // Blender Z-up → Unity Y-up, face toward player (-Z)
         islandGO.transform.localScale       = Vector3.one;
 
         // Measure full world-space AABB by transforming every mesh corner
@@ -814,7 +814,7 @@ public static class GameSetup
         islandGO.transform.SetParent(island.transform, false);
         islandGO.transform.localPosition    = new Vector3(0f, localY, 0f);
         islandGO.transform.localScale       = new Vector3(s, s, s);
-        islandGO.transform.localEulerAngles = new Vector3(-90f, 0f, 0f);
+        islandGO.transform.localEulerAngles = new Vector3(-90f, 180f, 0f);
 
         // Remove any colliders on the model — the CapsuleCollider on the root handles hits
         foreach (var col in islandGO.GetComponentsInChildren<Collider>())
