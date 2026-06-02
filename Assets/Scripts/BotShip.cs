@@ -58,7 +58,7 @@ public class BotShip : MonoBehaviour
         var model = Instantiate(piratShipModel, transform);
         model.name = "PiratShipVisual";
         model.transform.localPosition    = Vector3.zero;
-        model.transform.localEulerAngles = Vector3.zero;
+        model.transform.localEulerAngles = new Vector3(-90f, 270f, 0f); // Blender Z-up → Unity Y-up, bow toward +Z
         model.transform.localScale       = Vector3.one;
 
         // Measure world-space AABB
