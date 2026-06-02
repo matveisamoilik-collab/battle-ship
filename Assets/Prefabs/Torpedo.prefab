@@ -219,7 +219,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Torpedo
   speed: 50
   lifetime: 5
-  damage: 35
+  damage: 1
   explosionPrefab: {fileID: 9133770636241916477, guid: 95a8b89be36faa74caf677a90c3abb22, type: 3}
   isPlayerTorpedo: 0
 --- !u!1 &9171240717492616464

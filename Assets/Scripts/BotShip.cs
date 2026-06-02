@@ -5,7 +5,7 @@ public class BotShip : MonoBehaviour
     public enum AIState { AIM, REPOSITION }
 
     [Header("Movement")]
-    public float moveSpeed = 10f;
+    public float moveSpeed = 13f;
     public float rotationSpeed = 60f;
 
     [Header("Combat")]
@@ -13,7 +13,7 @@ public class BotShip : MonoBehaviour
     public Transform torpedoSpawnPoint;
 
     [Header("HP")]
-    public float maxHP = 245f;
+    public float maxHP = 7f;
     public HealthBar healthBar;
 
     [Header("Level 3 Visual")]
@@ -23,6 +23,8 @@ public class BotShip : MonoBehaviour
     private const float FiringArc = 10f;     // fire only when player is within this bow cone
 
     private float currentHP;
+    private float torpedoDamage;
+    private float currentFireDelay;
     private AIState state = AIState.AIM;
     private Transform player;
     private float nextFireTime;
@@ -32,17 +34,36 @@ public class BotShip : MonoBehaviour
 
     void Start()
     {
-        currentHP = maxHP;
+        bool isPirat  = GameManager.Instance != null && GameManager.Instance.PlayingLevel == 3;
+        ShipStats stats = isPirat ? ShipData.Pirate : ShipData.Blue;
+        moveSpeed        = stats.speed;
+        maxHP            = stats.hp;
+        torpedoDamage    = stats.torpedoDamage;
+        currentFireDelay = stats.fireDelay;
+        currentHP        = maxHP;
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
 
         GameObject playerGO = GameObject.FindWithTag("Player");
         if (playerGO != null) player = playerGO.transform;
 
-        nextFireTime = Time.time + 2f;
+        nextFireTime = Time.time + currentFireDelay;
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
 
-        if (GameManager.Instance != null && GameManager.Instance.PlayingLevel == 3)
+        ApplyBotShipVisual(isPirat);
+    }
+
+    void ApplyBotShipVisual(bool isPirat)
+    {
+        if (isPirat)
             ApplyPiratShipVisual();
+        else
+        {
+            Color blueColor = new Color(0.30f, 0.40f, 0.70f);
+            var hull  = transform.Find("Hull");
+            var cabin = transform.Find("Cabin");
+            if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr != null) mr.material.SetColor("_BaseColor", blueColor); }
+            if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr != null) mr.material.SetColor("_BaseColor", blueColor); }
+        }
     }
 
     void ApplyPiratShipVisual()
@@ -238,9 +259,9 @@ public class BotShip : MonoBehaviour
 
         GameObject t = Instantiate(torpedoPrefab, torpedoSpawnPoint.position, aimRot);
         Torpedo torpedo = t.GetComponent<Torpedo>();
-        if (torpedo != null) torpedo.isPlayerTorpedo = false;
+        if (torpedo != null) { torpedo.isPlayerTorpedo = false; torpedo.damage = torpedoDamage; }
 
-        nextFireTime = Time.time + Random.Range(1.6f, 2.4f);
+        nextFireTime = Time.time + Random.Range(currentFireDelay * 0.8f, currentFireDelay * 1.2f);
     }
 
     public void TakeDamage(float amount)

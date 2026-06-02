@@ -25,6 +25,13 @@ public class MainMenu : MonoBehaviour
     public Button     yellowRedShipSelectButton;
     public Text       yellowRedShipSelectedLabel;
 
+    public GameObject piratShipToBuyCard;
+    public GameObject piratShipBoughtCard;
+    public Button     buyPiratShipButton;
+    public Button     piratShipSelectButton;
+    public Text       piratShipSelectedLabel;
+    public Button     piratShipSellButton;
+
     public InputField promoCodeInput;
     public Text       promoFeedbackText;
 
@@ -117,6 +124,20 @@ public class MainMenu : MonoBehaviour
         if (yellowRedShipBoughtCard    != null) yellowRedShipBoughtCard.SetActive(yellowRedOwned);
         if (yellowRedShipSelectButton  != null) yellowRedShipSelectButton.gameObject.SetActive(yellowRedOwned && !yellowRedSelected);
         if (yellowRedShipSelectedLabel != null) yellowRedShipSelectedLabel.gameObject.SetActive(yellowRedOwned && yellowRedSelected);
+
+        bool piratOwned    = PlayerPrefs.GetInt("PiratShipOwned", 0) == 1;
+        bool piratSelected = selected == "pirat";
+
+        if (piratShipToBuyCard  != null) piratShipToBuyCard.SetActive(!piratOwned);
+        if (piratShipBoughtCard != null) piratShipBoughtCard.SetActive(piratOwned);
+        if (buyPiratShipButton  != null)
+            buyPiratShipButton.interactable =
+                !piratOwned &&
+                CoinManager.Instance != null &&
+                CoinManager.Instance.Coins >= 200;
+        if (piratShipSelectButton  != null) piratShipSelectButton.gameObject.SetActive(piratOwned && !piratSelected);
+        if (piratShipSellButton    != null) piratShipSellButton.gameObject.SetActive(piratOwned && !piratSelected);
+        if (piratShipSelectedLabel != null) piratShipSelectedLabel.gameObject.SetActive(piratOwned && piratSelected);
     }
 
     public void OnSelectBlueShip()
@@ -138,6 +159,33 @@ public class MainMenu : MonoBehaviour
         PlayerPrefs.SetString("SelectedShip", "yellowred");
         PlayerPrefs.Save();
         RefreshShopUI();
+    }
+
+    public void OnSelectPiratShip()
+    {
+        PlayerPrefs.SetString("SelectedShip", "pirat");
+        PlayerPrefs.Save();
+        RefreshShopUI();
+    }
+
+    public void OnBuyPiratShipClicked()
+    {
+        if (CoinManager.Instance == null || CoinManager.Instance.Coins < 200) return;
+        CoinManager.Instance.AddCoins(-200);
+        PlayerPrefs.SetInt("PiratShipOwned", 1);
+        PlayerPrefs.Save();
+        RefreshShopUI();
+        ShowBoughtTab();
+    }
+
+    public void OnSellPiratShipClicked()
+    {
+        if (PlayerPrefs.GetString("SelectedShip", "blue") == "pirat") return;
+        CoinManager.Instance?.AddCoins(100);
+        PlayerPrefs.SetInt("PiratShipOwned", 0);
+        PlayerPrefs.Save();
+        RefreshShopUI();
+        ShowToBuyTab();
     }
 
     public void OnSellYellowShipClicked()
@@ -190,6 +238,14 @@ public class MainMenu : MonoBehaviour
                 PlayerPrefs.SetInt("YellowRedShipOwned", 0);
                 if (PlayerPrefs.GetString("SelectedShip", "blue") == "yellowred")
                     PlayerPrefs.SetString("SelectedShip", "blue");
+            }
+            if (PlayerPrefs.GetInt("PiratShipOwned", 0) == 1)
+            {
+                CoinManager.Instance?.AddCoins(-200);
+                PlayerPrefs.SetInt("PiratShipOwned", 0);
+                if (PlayerPrefs.GetString("SelectedShip", "blue") == "pirat")
+                    PlayerPrefs.SetString("SelectedShip", "blue");
+                refunded++;
             }
             PlayerPrefs.Save();
             promoCodeInput.text     = "";

@@ -16,7 +16,8 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"Coins"` | int | 0 | Coin balance (managed by `CoinManager`) |
 | `"YellowShipOwned"` | int | 0 | 1 = yellow ship purchased |
 | `"YellowRedShipOwned"` | int | 0 | 1 = yellow-red ship unlocked via `pizza1` |
-| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, or `"yellowred"` |
+| `"PiratShipOwned"` | int | 0 | 1 = pirate ship purchased |
+| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, `"yellowred"`, or `"pirat"` |
 | `"Promo_pizza1"` … `"Promo_pizza8"` | int | 0 | 1 = promo code already redeemed |
 | `"CurrentLevel"` | int | 1 | Highest unlocked level: 1 (open water) or 2 (islands) |
 
@@ -65,7 +66,7 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 **Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are defined in the static array `MainMenu.s_validPromoCodes` (`pizza1`–`pizza8`). Each grants +5 coins once; used codes are tracked in PlayerPrefs (`"Promo_<code>"`). Feedback: green on success, orange for already-used, red for invalid.
 
 - **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
-- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts `PromoCodeReward` coins and clears the PlayerPrefs flag for each redeemed code, then if `pizza1` was reset also clears `"YellowRedShipOwned"` and reverts `"SelectedShip"` to `"blue"` if needed. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
+- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts `PromoCodeReward` coins and clears the PlayerPrefs flag for each redeemed code; if `pizza1` was reset, also clears `"YellowRedShipOwned"`; also resets `"PiratShipOwned"` and deducts 200 coins if owned. Reverts `"SelectedShip"` to `"blue"` if any reset ship was selected. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **`resetl` special code**: not in `s_validPromoCodes`; handled in `OnRedeemPromoCode()` before the valid-code check. Sets `"CurrentLevel"` to 1 and immediately updates `MainMenu.levelText` to "LEVEL: 1" so the top-right HUD reflects the reset without a scene reload. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **Future-proofing**: add new codes to `s_validPromoCodes` and `resett` covers them automatically. If a new code unlocks a ship, add the ship-revocation logic to the `pizza1WasReset`-style check in the `resett` block.
 
@@ -77,7 +78,7 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 
 **Adding a new promo-only ship:** add its card to BoughtContent only (not ToBuyContent), add `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` ownership key, handle in `RefreshShopUI()` and `ApplySelectedShip()`, add the unlock to the relevant promo code's special-case block in `OnRedeemPromoCode()`, and add ship-revocation to the `resett` block (model after the `pizza1WasReset` pattern).
 
-**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()` after the default HP/health-bar setup. It reads `"SelectedShip"` from PlayerPrefs and sets hull color, cabin color (`hull.material.SetColor("_BaseColor", …)` — `.material` instance, not `.sharedMaterial`), `moveSpeed`, `maxHP`, and `currentHP`, then refreshes the health bar. The yellow-red ship uses split colors: yellow hull + red cabin.
+**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()` after the default HP/health-bar setup. It reads `"SelectedShip"` from PlayerPrefs, looks up the matching `ShipStats` from `ShipData`, and sets `moveSpeed`, `maxHP`, `currentHP`, `fireInterval`, and `torpedoDamage` from it, then sets hull/cabin colors and refreshes the health bar. The yellow-red ship uses split colors: yellow hull + red cabin. All ship stats are centrally defined in `Assets/Scripts/ShipData.cs`.
 
 ### Mobile Controls (Android)
 
@@ -130,7 +131,7 @@ GameManager (non-persistent singleton, IsGameOver)
 
 **GameManager** is a non-persistent singleton (not `DontDestroyOnLoad`). It sets `Time.timeScale = 0f` on game-over and restores it to `1f` on scene reload. `ShakeCamera(duration, magnitude)` is the public entry point for all camera shake — do not call `CameraFollow.Shake()` directly.
 
-**BotShip visual**: Levels 1 & 2 use a red box hull (URP Lit, `BotMaterial`). Level 3 swaps to `pirat_ship.fbx` at runtime in `Start()` — the box MeshRenderers are disabled, the FBX is instantiated as a child and auto-scaled so its longest XZ axis = 12 units (hull length). The Hull BoxCollider stays active for torpedo hits. Source FBX: `3d/ship/pirat_ship.fbx`; imported asset: `Assets/Models/PiratShip/`. `GameManager.PlayingLevel` (public getter) is used to detect level 3. The FBX is exported from Blender (Z-up, `bakeAxisConversion: 0`) so `ApplyPiratShipVisual()` applies `localEulerAngles = new Vector3(-90f, 270f, 0f)` before the AABB measurement — `-90° X` uprights the ship (Blender Z-up → Unity Y-up), `270° Y` aligns the bow with `transform.forward` (+Z).
+**BotShip visual**: Level 1 & 2 bot uses **Blue ship** appearance (hull/cabin painted blue via `material.SetColor`). Level 3 bot uses **Pirate ship** (`pirat_ship.fbx`) — box MeshRenderers are disabled, FBX instantiated as a child and auto-scaled so its longest XZ axis = 12 units. Both player and bot share the same `pirat_ship.fbx` asset (`Assets/Models/PiratShip/`). The Hull BoxCollider stays active for torpedo hits. `ApplyBotShipVisual(isPirat)` in `BotShip` dispatches to `ApplyPiratShipVisual()` (FBX path) or blue-color assignment. The same `ApplyPiratShipVisual()` logic exists in `PlayerShip` for when the player selects the pirate ship. The FBX is exported from Blender (Z-up, `bakeAxisConversion: 0`) so rotation `(-90°X, 270°Y, 0°Z)` is applied before AABB measurement.
 
 **BotShip AI** has two states — `AIM` and `REPOSITION` — in a forward-only attack-run loop:
 - `AIM` (default) → rotates bow toward player (`RotateToward`), advances via `MoveForwardClamped()`, fires when player is within 10° of the bow and cooldown is ready, then transitions to `REPOSITION`.
@@ -147,19 +148,26 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 ### Game Balance Values
 | Stat | Value |
 |---|---|
-| Ship HP — blue / yellow | 245 (7 torpedo hits) |
-| Ship HP — yellow-red | 280 (8 torpedo hits) |
-| Torpedo damage | 35 |
+| Ship HP — blue / yellow | 7 |
+| Ship HP — yellow-red | 8 |
+| Ship HP — pirate | 7 |
+| Torpedo damage — blue / yellow / yellow-red | 1 |
+| Torpedo damage — pirate | 1.2 |
 | Torpedo speed | 50 units/s |
 | Torpedo lifetime | 5 s |
-| Player fire cooldown | 2 s |
-| Bot fire interval | 1.6–2.4 s random |
-| Player move speed — blue ship | 15 units/s |
-| Player move speed — yellow ship | 30 units/s (2× blue) |
-| Player move speed — yellow-red ship | 18 units/s (1.2× blue) |
-| Bot move speed | 10 units/s |
+| Player fire cooldown — blue / yellow / yellow-red | 2 s |
+| Player fire cooldown — pirate | 1.5 s |
+| Bot fire interval | ±20% of ship base delay |
+| Player move speed — blue ship | 20 units/s |
+| Player move speed — yellow ship | 40 units/s (2× blue) |
+| Player move speed — yellow-red ship | 24 units/s (1.2× blue) |
+| Player move speed — pirate ship | 20 units/s (same as blue) |
+| Bot move speed — L1/L2 (blue) | 20 units/s |
+| Bot move speed — L3 (pirate) | 20 units/s |
 | Yellow ship cost | 150 coins |
 | Yellow ship sell price | 75 coins (half price) |
+| Pirate ship cost | 200 coins |
+| Pirate ship sell price | 100 coins (half price) |
 | Promo code reward | 5 coins |
 
 ### Arena & Environment

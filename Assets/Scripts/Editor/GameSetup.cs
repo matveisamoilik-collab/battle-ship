@@ -548,7 +548,10 @@ public static class GameSetup
 
         var piratPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/PiratShip/pirat_ship.fbx");
         if (piratPrefab != null)
-            botShip.piratShipModel = piratPrefab;
+        {
+            botShip.piratShipModel    = piratPrefab;
+            playerShip.piratShipModel = piratPrefab;
+        }
         else
             Debug.LogWarning("[ShipButtlr] pirat_ship.fbx not found — run Build All again after Unity imports it.");
 
@@ -1270,6 +1273,49 @@ public static class GameSetup
         buyBtnRT.sizeDelta        = Vector2.zero;
         buyBtnRT.anchoredPosition = Vector2.zero;
 
+        // Pirate ship card (To Buy)
+        var piratToBuyGO = new GameObject("PiratShipCard");
+        piratToBuyGO.transform.SetParent(toBuyContentGO.transform, false);
+        var piratToBuyImg = piratToBuyGO.AddComponent<Image>();
+        piratToBuyImg.color = new Color(0.15f, 0.10f, 0.05f, 1f);
+        var piratToBuyRT = piratToBuyGO.GetComponent<RectTransform>();
+        piratToBuyRT.anchorMin = new Vector2(0.42f, 0.55f);
+        piratToBuyRT.anchorMax = new Vector2(0.78f, 0.98f);
+        piratToBuyRT.offsetMin = Vector2.zero;
+        piratToBuyRT.offsetMax = Vector2.zero;
+
+        var ptSwatchGO = new GameObject("ColorSwatch");
+        ptSwatchGO.transform.SetParent(piratToBuyGO.transform, false);
+        var ptSwatchImg = ptSwatchGO.AddComponent<Image>();
+        ptSwatchImg.color = new Color(0.45f, 0.30f, 0.15f);
+        var ptSwatchRT = ptSwatchGO.GetComponent<RectTransform>();
+        ptSwatchRT.anchorMin = new Vector2(0.05f, 0.55f);
+        ptSwatchRT.anchorMax = new Vector2(0.95f, 0.95f);
+        ptSwatchRT.offsetMin = Vector2.zero;
+        ptSwatchRT.offsetMax = Vector2.zero;
+
+        var ptNameGO = MakeText("ShipNameText", piratToBuyGO.transform, "PIRAT SHIP", 22, Color.white);
+        var ptNameRT = ptNameGO.GetComponent<RectTransform>();
+        ptNameRT.anchorMin = new Vector2(0f, 0.40f);
+        ptNameRT.anchorMax = new Vector2(1f, 0.53f);
+        ptNameRT.offsetMin = Vector2.zero;
+        ptNameRT.offsetMax = Vector2.zero;
+        ptNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var ptPriceGO = MakeText("PriceText", piratToBuyGO.transform, "200 COINS", 20, Color.yellow);
+        var ptPriceRT = ptPriceGO.GetComponent<RectTransform>();
+        ptPriceRT.anchorMin = new Vector2(0f, 0.27f);
+        ptPriceRT.anchorMax = new Vector2(1f, 0.40f);
+        ptPriceRT.offsetMin = Vector2.zero;
+        ptPriceRT.offsetMax = Vector2.zero;
+
+        var piratBuyBtnGO = MakeButton("BuyButton", piratToBuyGO.transform, "BUY");
+        var piratBuyBtnRT = piratBuyBtnGO.GetComponent<RectTransform>();
+        piratBuyBtnRT.anchorMin        = new Vector2(0.10f, 0.03f);
+        piratBuyBtnRT.anchorMax        = new Vector2(0.90f, 0.24f);
+        piratBuyBtnRT.sizeDelta        = Vector2.zero;
+        piratBuyBtnRT.anchoredPosition = Vector2.zero;
+
         // Promo code section — bottom strip of ToBuyContent
         var promoSectionGO = new GameObject("PromoSection");
         promoSectionGO.transform.SetParent(toBuyContentGO.transform, false);
@@ -1498,6 +1544,60 @@ public static class GameSetup
 
         yrBoughtGO.SetActive(false);
 
+        // Pirate ship card (Bought tab — initially inactive; RefreshShopUI activates on purchase)
+        var piratBoughtGO = new GameObject("PiratShipBoughtCard");
+        piratBoughtGO.transform.SetParent(boughtContentGO.transform, false);
+        var piratBoughtImg = piratBoughtGO.AddComponent<Image>();
+        piratBoughtImg.color = new Color(0.15f, 0.10f, 0.05f, 1f);
+        var piratBoughtRT = piratBoughtGO.GetComponent<RectTransform>();
+        piratBoughtRT.anchorMin = new Vector2(0.42f, 0.38f);
+        piratBoughtRT.anchorMax = new Vector2(0.78f, 0.66f);
+        piratBoughtRT.offsetMin = Vector2.zero;
+        piratBoughtRT.offsetMax = Vector2.zero;
+
+        var pbSwatchGO = new GameObject("ColorSwatch");
+        pbSwatchGO.transform.SetParent(piratBoughtGO.transform, false);
+        var pbSwatchImg = pbSwatchGO.AddComponent<Image>();
+        pbSwatchImg.color = new Color(0.45f, 0.30f, 0.15f);
+        var pbSwatchRT = pbSwatchGO.GetComponent<RectTransform>();
+        pbSwatchRT.anchorMin = new Vector2(0.05f, 0.45f);
+        pbSwatchRT.anchorMax = new Vector2(0.95f, 0.92f);
+        pbSwatchRT.offsetMin = Vector2.zero;
+        pbSwatchRT.offsetMax = Vector2.zero;
+
+        var pbNameGO = MakeText("ShipNameText", piratBoughtGO.transform, "PIRAT SHIP", 22, Color.white);
+        var pbNameRT = pbNameGO.GetComponent<RectTransform>();
+        pbNameRT.anchorMin = new Vector2(0f, 0.30f);
+        pbNameRT.anchorMax = new Vector2(1f, 0.43f);
+        pbNameRT.offsetMin = Vector2.zero;
+        pbNameRT.offsetMax = Vector2.zero;
+        pbNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var piratSelectBtnGO = MakeButton("SelectButton", piratBoughtGO.transform, "SELECT");
+        var piratSelectBtnRT = piratSelectBtnGO.GetComponent<RectTransform>();
+        piratSelectBtnRT.anchorMin        = new Vector2(0.05f, 0.04f);
+        piratSelectBtnRT.anchorMax        = new Vector2(0.52f, 0.26f);
+        piratSelectBtnRT.sizeDelta        = Vector2.zero;
+        piratSelectBtnRT.anchoredPosition = Vector2.zero;
+
+        var piratSellBtnGO = MakeButton("SellButton", piratBoughtGO.transform, "SELL");
+        var piratSellBtnRT = piratSellBtnGO.GetComponent<RectTransform>();
+        piratSellBtnRT.anchorMin        = new Vector2(0.55f, 0.04f);
+        piratSellBtnRT.anchorMax        = new Vector2(0.95f, 0.26f);
+        piratSellBtnRT.sizeDelta        = Vector2.zero;
+        piratSellBtnRT.anchoredPosition = Vector2.zero;
+        piratSellBtnGO.GetComponent<Image>().color = new Color(0.65f, 0.12f, 0.12f);
+
+        var piratSelectedLabelGO = MakeText("SelectedLabel", piratBoughtGO.transform, "✓ SELECTED", 20, Color.green);
+        var piratSelectedLabelRT = piratSelectedLabelGO.GetComponent<RectTransform>();
+        piratSelectedLabelRT.anchorMin = new Vector2(0.05f, 0.04f);
+        piratSelectedLabelRT.anchorMax = new Vector2(0.95f, 0.26f);
+        piratSelectedLabelRT.offsetMin = Vector2.zero;
+        piratSelectedLabelRT.offsetMax = Vector2.zero;
+        piratSelectedLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        piratBoughtGO.SetActive(false);
+
         // Assign MainMenu fields
         script.shopPanel              = shopPanelGO;
         script.toBuyContent           = toBuyContentGO;
@@ -1513,6 +1613,12 @@ public static class GameSetup
         script.yellowRedShipBoughtCard    = yrBoughtGO;
         script.yellowRedShipSelectButton  = yrSelectBtnGO.GetComponent<Button>();
         script.yellowRedShipSelectedLabel = yrSelectedLabelGO.GetComponent<Text>();
+        script.piratShipToBuyCard         = piratToBuyGO;
+        script.piratShipBoughtCard        = piratBoughtGO;
+        script.buyPiratShipButton         = piratBuyBtnGO.GetComponent<Button>();
+        script.piratShipSelectButton      = piratSelectBtnGO.GetComponent<Button>();
+        script.piratShipSelectedLabel     = piratSelectedLabelGO.GetComponent<Text>();
+        script.piratShipSellButton        = piratSellBtnGO.GetComponent<Button>();
         script.promoCodeInput             = promoInputField;
         script.promoFeedbackText          = promoFeedbackGO.GetComponent<Text>();
 
@@ -1541,6 +1647,15 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             yrSelectBtnGO.GetComponent<Button>().onClick,
             script.OnSelectYellowRedShip);
+        UnityEventTools.AddPersistentListener(
+            piratBuyBtnGO.GetComponent<Button>().onClick,
+            script.OnBuyPiratShipClicked);
+        UnityEventTools.AddPersistentListener(
+            piratSelectBtnGO.GetComponent<Button>().onClick,
+            script.OnSelectPiratShip);
+        UnityEventTools.AddPersistentListener(
+            piratSellBtnGO.GetComponent<Button>().onClick,
+            script.OnSellPiratShipClicked);
         UnityEventTools.AddPersistentListener(
             redeemBtnGO.GetComponent<Button>().onClick,
             script.OnRedeemPromoCode);

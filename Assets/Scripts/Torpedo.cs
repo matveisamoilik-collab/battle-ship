@@ -5,7 +5,7 @@ public class Torpedo : MonoBehaviour
 {
     public float speed = 50f;
     public float lifetime = 5f;
-    public float damage = 35f;
+    public float damage = 1f;
     public GameObject explosionPrefab;
     public bool isPlayerTorpedo = false;
 
