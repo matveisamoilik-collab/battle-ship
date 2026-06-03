@@ -520,7 +520,7 @@ public static class GameSetup
         arena.GetComponent<MeshRenderer>().sharedMaterial = mats["Water"];
 
         // Decorative islands grouped under IslandsRoot so level 1 can disable them all
-        var islandsRootGO = new GameObject("IslandsRoot");
+        var islandsRootGO = new GameObject("Level2_Islands");
         CreateIsland(new Vector3( 72f, 0f,  68f), 12f, 3, mats, islandsRootGO.transform);
         CreateIsland(new Vector3(-65f, 0f,  75f),  9f, 2, mats, islandsRootGO.transform);
         CreateIsland(new Vector3( 58f, 0f, -72f), 10f, 3, mats, islandsRootGO.transform);
@@ -529,11 +529,11 @@ public static class GameSetup
         CreateIsland(new Vector3(-45f, 0f, -80f), 11f, 3, mats, islandsRootGO.transform);
 
         // Level 3: Skull Shoals — one massive central island with skull model + 6 rock sentinels
-        var islands3RootGO = new GameObject("Islands3Root");
+        var islands3RootGO = new GameObject("Level3_SkullShoals");
         CreateSkullIsland(Vector3.zero, 33.6f, mats, islands3RootGO.transform);
 
         // Level 4: Volcano — central volcano island matching Level 3 scale
-        var islands4RootGO = new GameObject("Islands4Root");
+        var islands4RootGO = new GameObject("Level4_Volcano");
         CreateVulcanoIsland(Vector3.zero, 33.6f, mats, islands4RootGO.transform);
         float[] rockAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
         foreach (float angle in rockAngles)
@@ -1280,14 +1280,14 @@ public static class GameSetup
         isle3RT.offsetMin = Vector2.zero;
         isle3RT.offsetMax = Vector2.zero;
 
-        // Island 4 — Volcano (locked until CurrentLevel >= 4)
+        // Island 4 — Storm Isle / Volcano (locked until CurrentLevel >= 4)
         var isle4GO = new GameObject("Island4Button");
         isle4GO.transform.SetParent(panel.transform, false);
         isle4GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
         var isle4Btn = isle4GO.AddComponent<Button>();
         var isle4RT  = isle4GO.GetComponent<RectTransform>();
-        isle4RT.anchorMin = new Vector2(0.55f, 0.55f);
-        isle4RT.anchorMax = new Vector2(0.70f, 0.70f);
+        isle4RT.anchorMin = new Vector2(0.37f, 0.38f);
+        isle4RT.anchorMax = new Vector2(0.60f, 0.72f);
         isle4RT.offsetMin = Vector2.zero;
         isle4RT.offsetMax = Vector2.zero;
 

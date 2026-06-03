@@ -232,8 +232,15 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 - `private bool wonLastGame` — set true in `BotDefeated()`, false by default. Used in `PlayAgain()` to decide whether to advance.
 
 **Map panel structure** (built by `GameSetup.BuildMapPanel()`):
-- `MapPanel` (full-screen, dark overlay) → `MapImage` (fills panel, sprite swapped at runtime) + `Island1Button` + `Island2Button` (transparent hit areas) + `CloseButton` (top-right "X").
-- Island button anchors are estimated from image pixel positions — may need tuning if positions feel off.
+- `MapPanel` (full-screen, dark overlay) → `MapImage` (fills panel, sprite swapped at runtime) + `Island1Button`…`Island4Button` (transparent hit areas) + `CloseButton` (top-right "X").
+- Island button anchors are calibrated against image pixel positions (image ≈ 600×400). **Do not estimate — measure from the island body, not the label text:**
+
+| Button | anchorMin | anchorMax | Notes |
+|---|---|---|---|
+| Island1 (Coral Cove) | (0.07, 0.17) | (0.19, 0.31) | bottom-left |
+| Island2 (Pirate's Rest) | (0.20, 0.47) | (0.32, 0.61) | middle-left |
+| Island3 (Skull Shoals) | (0.23, 0.15) | (0.39, 0.31) | bottom-center |
+| Island4 (Storm Isle) | (0.37, 0.38) | (0.60, 0.72) | center — volcano body, NOT the label to its right |
 
 **4-button MainMenu layout** (anchor Y bands):
 - PLAY: 0.56–0.65 | MAP: 0.44–0.53 | SHOP: 0.32–0.41 | QUIT: 0.20–0.29
