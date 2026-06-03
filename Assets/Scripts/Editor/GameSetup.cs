@@ -1206,20 +1206,27 @@ public static class GameSetup
         closeRT.sizeDelta        = Vector2.zero;
         closeRT.anchoredPosition = Vector2.zero;
 
-        // Tab buttons — side by side across the top strip
+        // Tab buttons — three tabs across the top strip
         var toBuyTabGO = MakeButton("ToBuyTab", shopPanelGO.transform, "TO BUY");
         var toBuyTabRT = toBuyTabGO.GetComponent<RectTransform>();
         toBuyTabRT.anchorMin        = new Vector2(0.02f, 0.82f);
-        toBuyTabRT.anchorMax        = new Vector2(0.48f, 0.92f);
+        toBuyTabRT.anchorMax        = new Vector2(0.31f, 0.92f);
         toBuyTabRT.sizeDelta        = Vector2.zero;
         toBuyTabRT.anchoredPosition = Vector2.zero;
 
         var boughtTabGO = MakeButton("BoughtTab", shopPanelGO.transform, "BOUGHT");
         var boughtTabRT = boughtTabGO.GetComponent<RectTransform>();
-        boughtTabRT.anchorMin        = new Vector2(0.52f, 0.82f);
-        boughtTabRT.anchorMax        = new Vector2(0.98f, 0.92f);
+        boughtTabRT.anchorMin        = new Vector2(0.35f, 0.82f);
+        boughtTabRT.anchorMax        = new Vector2(0.64f, 0.92f);
         boughtTabRT.sizeDelta        = Vector2.zero;
         boughtTabRT.anchoredPosition = Vector2.zero;
+
+        var statsTabGO = MakeButton("StatsTab", shopPanelGO.transform, "STATS");
+        var statsTabRT = statsTabGO.GetComponent<RectTransform>();
+        statsTabRT.anchorMin        = new Vector2(0.68f, 0.82f);
+        statsTabRT.anchorMax        = new Vector2(0.98f, 0.92f);
+        statsTabRT.sizeDelta        = Vector2.zero;
+        statsTabRT.anchoredPosition = Vector2.zero;
 
         // ToBuy content panel
         var toBuyContentGO = new GameObject("ToBuyContent");
@@ -1598,6 +1605,96 @@ public static class GameSetup
 
         piratBoughtGO.SetActive(false);
 
+        // Stats content panel — ship comparison table
+        var statsContentGO = new GameObject("StatsContent");
+        statsContentGO.transform.SetParent(shopPanelGO.transform, false);
+        var statsContentRT = statsContentGO.AddComponent<RectTransform>();
+        statsContentRT.anchorMin = new Vector2(0.02f, 0.05f);
+        statsContentRT.anchorMax = new Vector2(0.98f, 0.80f);
+        statsContentRT.offsetMin = Vector2.zero;
+        statsContentRT.offsetMax = Vector2.zero;
+
+        // Table helper: each row occupies 1/6 of the height (header + 5 data rows)
+        // Row bands from top: header=0.84–1.0, then rows spaced 0.155 apart downward
+        string[] colHeaders = { "SHIP",       "SIZE",  "HP", "SPD", "DMG",  "DELAY" };
+        float[]  colMins    = {  0.00f,         0.30f,  0.45f, 0.57f, 0.70f, 0.83f  };
+        float[]  colMaxs    = {  0.29f,         0.44f,  0.56f, 0.69f, 0.82f, 1.00f  };
+
+        // Header row background
+        var hdrBgGO = new GameObject("HeaderBg");
+        hdrBgGO.transform.SetParent(statsContentGO.transform, false);
+        var hdrBgImg = hdrBgGO.AddComponent<Image>();
+        hdrBgImg.color = new Color(0.12f, 0.12f, 0.30f, 1f);
+        var hdrBgRT = hdrBgGO.GetComponent<RectTransform>();
+        hdrBgRT.anchorMin = new Vector2(0f, 0.84f);
+        hdrBgRT.anchorMax = new Vector2(1f, 1.00f);
+        hdrBgRT.offsetMin = hdrBgRT.offsetMax = Vector2.zero;
+
+        for (int c = 0; c < colHeaders.Length; c++)
+        {
+            var cellGO = MakeText("H_" + colHeaders[c], hdrBgGO.transform, colHeaders[c], 18, Color.white);
+            var cellRT = cellGO.GetComponent<RectTransform>();
+            cellRT.anchorMin = new Vector2(colMins[c], 0f);
+            cellRT.anchorMax = new Vector2(colMaxs[c], 1f);
+            cellRT.offsetMin = cellRT.offsetMax = Vector2.zero;
+            cellGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        }
+
+        // Data rows: Blue, Yellow, YellowRed, Pirate, Black(bot)
+        string[][] rows = {
+            new[] { "BLUE",        "1.00", "7", "20", "1.0", "2.0s" },
+            new[] { "YELLOW",      "1.00", "7", "40", "1.0", "2.0s" },
+            new[] { "YELLOW-RED",  "1.00", "8", "24", "1.0", "2.0s" },
+            new[] { "PIRATE",      "1.00", "7", "20", "1.2", "1.5s" },
+            new[] { "BLACK (BOT)", "0.66", "2", "15", "1.0", "2.5s" },
+        };
+        Color[] rowBgColors = {
+            new Color(0.15f, 0.20f, 0.35f, 0.85f),
+            new Color(0.20f, 0.18f, 0.04f, 0.85f),
+            new Color(0.18f, 0.04f, 0.04f, 0.85f),
+            new Color(0.12f, 0.08f, 0.04f, 0.85f),
+            new Color(0.08f, 0.08f, 0.08f, 0.85f),
+        };
+        float rowHeight = 0.155f;
+        float rowTop    = 0.84f;
+
+        for (int r = 0; r < rows.Length; r++)
+        {
+            float yMax = rowTop - r * rowHeight;
+            float yMin = yMax - rowHeight + 0.005f; // 0.5% gap between rows
+
+            var rowBgGO  = new GameObject("Row_" + rows[r][0]);
+            rowBgGO.transform.SetParent(statsContentGO.transform, false);
+            var rowBgImg = rowBgGO.AddComponent<Image>();
+            rowBgImg.color = rowBgColors[r];
+            var rowBgRT  = rowBgGO.GetComponent<RectTransform>();
+            rowBgRT.anchorMin = new Vector2(0f, yMin);
+            rowBgRT.anchorMax = new Vector2(1f, yMax);
+            rowBgRT.offsetMin = rowBgRT.offsetMax = Vector2.zero;
+
+            // Ship name column: left-aligned, slightly larger
+            var rowNameGO = MakeText("Col0", rowBgGO.transform, rows[r][0], 17, Color.white);
+            var rowNameRT = rowNameGO.GetComponent<RectTransform>();
+            rowNameRT.anchorMin = new Vector2(colMins[0] + 0.01f, 0f);
+            rowNameRT.anchorMax = new Vector2(colMaxs[0], 1f);
+            rowNameRT.offsetMin = rowNameRT.offsetMax = Vector2.zero;
+            var rowNameTxt = rowNameGO.GetComponent<Text>();
+            rowNameTxt.alignment = TextAnchor.MiddleLeft;
+            rowNameTxt.fontStyle = FontStyle.Bold;
+
+            // Stat columns: centered
+            for (int c = 1; c < rows[r].Length; c++)
+            {
+                var cellGO = MakeText("Col" + c, rowBgGO.transform, rows[r][c], 18, Color.white);
+                var cellRT = cellGO.GetComponent<RectTransform>();
+                cellRT.anchorMin = new Vector2(colMins[c], 0f);
+                cellRT.anchorMax = new Vector2(colMaxs[c], 1f);
+                cellRT.offsetMin = cellRT.offsetMax = Vector2.zero;
+            }
+        }
+
+        statsContentGO.SetActive(false);
+
         // Assign MainMenu fields
         script.shopPanel              = shopPanelGO;
         script.toBuyContent           = toBuyContentGO;
@@ -1621,6 +1718,7 @@ public static class GameSetup
         script.piratShipSellButton        = piratSellBtnGO.GetComponent<Button>();
         script.promoCodeInput             = promoInputField;
         script.promoFeedbackText          = promoFeedbackGO.GetComponent<Text>();
+        script.statsContent               = statsContentGO;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(
@@ -1632,6 +1730,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             boughtTabGO.GetComponent<Button>().onClick,
             script.ShowBoughtTab);
+        UnityEventTools.AddPersistentListener(
+            statsTabGO.GetComponent<Button>().onClick,
+            script.ShowStatsTab);
         UnityEventTools.AddPersistentListener(
             buyBtnGO.GetComponent<Button>().onClick,
             script.OnBuyYellowShipClicked);

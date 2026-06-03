@@ -19,8 +19,10 @@ public class BotShip : MonoBehaviour
     [Header("Level 3 Visual")]
     public GameObject piratShipModel;
 
-    private const float MinPlayerDist = 18f; // 1.5 hull lengths — bot never crosses this
-    private const float FiringArc = 10f;     // fire only when player is within this bow cone
+    private const float FiringArc = 10f; // fire only when player is within this bow cone
+
+    private float minPlayerDist;   // set in Start() based on ship size
+    private float shipHullRadius;  // half hull length, used for collision checks
 
     private float currentHP;
     private float torpedoDamage;
@@ -34,8 +36,11 @@ public class BotShip : MonoBehaviour
 
     void Start()
     {
-        bool isPirat  = GameManager.Instance != null && GameManager.Instance.PlayingLevel == 3;
-        ShipStats stats = isPirat ? ShipData.Pirate : ShipData.Blue;
+        int level    = GameManager.Instance != null ? GameManager.Instance.PlayingLevel : 1;
+        bool isBlack = level == 1;
+        bool isPirat = level == 3;
+
+        ShipStats stats = isBlack ? ShipData.Black : (isPirat ? ShipData.Pirate : ShipData.Blue);
         moveSpeed        = stats.speed;
         maxHP            = stats.hp;
         torpedoDamage    = stats.torpedoDamage;
@@ -43,18 +48,24 @@ public class BotShip : MonoBehaviour
         currentHP        = maxHP;
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
 
+        // Collision radii depend on hull size (black ship is 1.5× smaller)
+        shipHullRadius = isBlack ? 4f : 6f;          // half hull length
+        minPlayerDist  = isBlack ? 14f : 18f;        // self + player half-lengths + buffer
+
         GameObject playerGO = GameObject.FindWithTag("Player");
         if (playerGO != null) player = playerGO.transform;
 
         nextFireTime = Time.time + currentFireDelay;
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
 
-        ApplyBotShipVisual(isPirat);
+        ApplyBotShipVisual(isBlack, isPirat);
     }
 
-    void ApplyBotShipVisual(bool isPirat)
+    void ApplyBotShipVisual(bool isBlack, bool isPirat)
     {
-        if (isPirat)
+        if (isBlack)
+            ApplyBlackShipVisual();
+        else if (isPirat)
             ApplyPiratShipVisual();
         else
         {
@@ -64,6 +75,19 @@ public class BotShip : MonoBehaviour
             if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr != null) mr.material.SetColor("_BaseColor", blueColor); }
             if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr != null) mr.material.SetColor("_BaseColor", blueColor); }
         }
+    }
+
+    void ApplyBlackShipVisual()
+    {
+        // Scale the entire ship down by 1/1.5 so it is 1.5× smaller than the blue ship
+        float s = 2f / 3f;
+        transform.localScale = new Vector3(s, s, s);
+
+        Color blackColor = new Color(0.1f, 0.1f, 0.1f);
+        var hull  = transform.Find("Hull");
+        var cabin = transform.Find("Cabin");
+        if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr != null) mr.material.SetColor("_BaseColor", blackColor); }
+        if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr != null) mr.material.SetColor("_BaseColor", blackColor); }
     }
 
     void ApplyPiratShipVisual()
@@ -177,12 +201,12 @@ public class BotShip : MonoBehaviour
         desired.y = 0f;
 
         Vector3 p = new Vector3(player.position.x, 0f, player.position.z);
-        if (Vector3.Distance(desired, p) < MinPlayerDist)
+        if (Vector3.Distance(desired, p) < minPlayerDist)
         {
             Vector3 dir = desired - p;
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.0001f) dir = start - p;
-            desired = p + dir.normalized * MinPlayerDist;
+            desired = p + dir.normalized * minPlayerDist;
         }
 
         transform.position = desired;
@@ -214,7 +238,7 @@ public class BotShip : MonoBehaviour
     Vector3 PushOutOfShip(Vector3 pos, Transform other)
     {
         if (other == null) return pos;
-        const float combinedRadius = 12f; // 6 (self) + 6 (other)
+        float combinedRadius = shipHullRadius + 6f; // self hull half-length + player hull half-length
         float dx = pos.x - other.position.x;
         float dz = pos.z - other.position.z;
         float distSq = dx * dx + dz * dz;
@@ -229,14 +253,13 @@ public class BotShip : MonoBehaviour
 
     Vector3 PushOutOfIslands(Vector3 pos)
     {
-        const float shipRadius = 6f; // hull half-length — prevents front/back penetration
         foreach (var island in islands)
         {
             if (island == null) continue;
             float dx = pos.x - island.transform.position.x;
             float dz = pos.z - island.transform.position.z;
             float distSq = dx * dx + dz * dz;
-            float minDist = island.radius + shipRadius;
+            float minDist = island.radius + shipHullRadius;
             if (distSq < minDist * minDist && distSq > 0.0001f)
             {
                 float dist = Mathf.Sqrt(distSq);

@@ -35,6 +35,8 @@ public class MainMenu : MonoBehaviour
     public InputField promoCodeInput;
     public Text       promoFeedbackText;
 
+    public GameObject statsContent;
+
     // Map panel
     public static int levelToPlay = -1;
     public GameObject mapPanel;
@@ -84,12 +86,21 @@ public class MainMenu : MonoBehaviour
     {
         if (toBuyContent  != null) toBuyContent.SetActive(true);
         if (boughtContent != null) boughtContent.SetActive(false);
+        if (statsContent  != null) statsContent.SetActive(false);
     }
 
     public void ShowBoughtTab()
     {
         if (toBuyContent  != null) toBuyContent.SetActive(false);
         if (boughtContent != null) boughtContent.SetActive(true);
+        if (statsContent  != null) statsContent.SetActive(false);
+    }
+
+    public void ShowStatsTab()
+    {
+        if (toBuyContent  != null) toBuyContent.SetActive(false);
+        if (boughtContent != null) boughtContent.SetActive(false);
+        if (statsContent  != null) statsContent.SetActive(true);
     }
 
     public void RefreshShopUI()

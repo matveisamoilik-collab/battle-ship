@@ -131,7 +131,14 @@ GameManager (non-persistent singleton, IsGameOver)
 
 **GameManager** is a non-persistent singleton (not `DontDestroyOnLoad`). It sets `Time.timeScale = 0f` on game-over and restores it to `1f` on scene reload. `ShakeCamera(duration, magnitude)` is the public entry point for all camera shake — do not call `CameraFollow.Shake()` directly.
 
-**BotShip visual**: Level 1 & 2 bot uses **Blue ship** appearance (hull/cabin painted blue via `material.SetColor`). Level 3 bot uses **Pirate ship** (`pirat_ship.fbx`) — box MeshRenderers are disabled, FBX instantiated as a child and auto-scaled so its longest XZ axis = 12 units. Both player and bot share the same `pirat_ship.fbx` asset (`Assets/Models/PiratShip/`). The Hull BoxCollider stays active for torpedo hits. `ApplyBotShipVisual(isPirat)` in `BotShip` dispatches to `ApplyPiratShipVisual()` (FBX path) or blue-color assignment. The same `ApplyPiratShipVisual()` logic exists in `PlayerShip` for when the player selects the pirate ship. The FBX is exported from Blender (Z-up, `bakeAxisConversion: 0`) so rotation `(-90°X, 270°Y, 0°Z)` is applied before AABB measurement.
+**BotShip visual**: Bot ship type is determined by level at runtime in `BotShip.Start()`:
+- **Level 1** — **Black ship**: box geometry scaled down by 1/1.5 (root `localScale = (0.667, 0.667, 0.667)`), hull/cabin painted near-black. Hull world length ≈ 8 units; collision half-radius = 4f; `minPlayerDist = 14f`.
+- **Level 2** — **Blue ship**: hull/cabin painted blue via `material.SetColor`. Hull 12 units; collision half-radius = 6f; `minPlayerDist = 18f`.
+- **Level 3** — **Pirate ship** (`pirat_ship.fbx`): box MeshRenderers are disabled, FBX instantiated as a child and auto-scaled so its longest XZ axis = 12 units. Both player and bot share the same `pirat_ship.fbx` asset (`Assets/Models/PiratShip/`). The Hull BoxCollider stays active for torpedo hits.
+
+`ApplyBotShipVisual(isBlack, isPirat)` in `BotShip` dispatches to `ApplyBlackShipVisual()`, `ApplyPiratShipVisual()`, or blue-color assignment. The same `ApplyPiratShipVisual()` logic exists in `PlayerShip` for when the player selects the pirate ship. The FBX is exported from Blender (Z-up, `bakeAxisConversion: 0`) so rotation `(-90°X, 270°Y, 0°Z)` is applied before AABB measurement.
+
+**Black ship** is bot-only (not available in the shop). It appears only on Level 1.
 
 **BotShip AI** has two states — `AIM` and `REPOSITION` — in a forward-only attack-run loop:
 - `AIM` (default) → rotates bow toward player (`RotateToward`), advances via `MoveForwardClamped()`, fires when player is within 10° of the bow and cooldown is ready, then transitions to `REPOSITION`.
@@ -151,7 +158,8 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Ship HP — blue / yellow | 7 |
 | Ship HP — yellow-red | 8 |
 | Ship HP — pirate | 7 |
-| Torpedo damage — blue / yellow / yellow-red | 1 |
+| Ship HP — black (bot L1) | 2 |
+| Torpedo damage — blue / yellow / yellow-red / black | 1 |
 | Torpedo damage — pirate | 1.2 |
 | Torpedo speed | 50 units/s |
 | Torpedo lifetime | 5 s |
@@ -162,8 +170,10 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Player move speed — yellow ship | 40 units/s (2× blue) |
 | Player move speed — yellow-red ship | 24 units/s (1.2× blue) |
 | Player move speed — pirate ship | 20 units/s (same as blue) |
-| Bot move speed — L1/L2 (blue) | 20 units/s |
+| Bot move speed — L1 (black) | 15 units/s |
+| Bot move speed — L2 (blue) | 20 units/s |
 | Bot move speed — L3 (pirate) | 20 units/s |
+| Bot fire delay — L1 (black) | 2.5 s base (±20%) |
 | Yellow ship cost | 150 coins |
 | Yellow ship sell price | 75 coins (half price) |
 | Pirate ship cost | 200 coins |
