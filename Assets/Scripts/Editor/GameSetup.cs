@@ -28,9 +28,11 @@ public static class GameSetup
         var mats = CreateMaterials();
         var explosionPrefab = CreateExplosionPrefab();
         var torpedoPrefab   = CreateTorpedoPrefab(explosionPrefab, mats["Torpedo"]);
+        var splashPrefab    = CreateSplashPrefab();
+        var stonePrefab     = CreateVolcanoStonePrefab(splashPrefab, mats["Volcanic"]);
 
         BuildMainMenuScene();
-        BuildGameScene(mats, torpedoPrefab);
+        BuildGameScene(mats, torpedoPrefab, stonePrefab);
         ConfigureBuildSettings();
 
         AssetDatabase.SaveAssets();
@@ -170,7 +172,73 @@ public static class GameSetup
     }
 
     // -------------------------------------------------------------------------
-    // 5. Torpedo prefab
+    // 5. Volcano stone + splash prefabs
+    // -------------------------------------------------------------------------
+
+    static GameObject CreateSplashPrefab()
+    {
+        string path = "Assets/Prefabs/SplashEffect.prefab";
+        var go = new GameObject("SplashEffect");
+        var ps = go.AddComponent<ParticleSystem>();
+
+        var main = ps.main;
+        main.duration      = 0.8f;
+        main.loop          = false;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.9f);
+        main.startSpeed    = new ParticleSystem.MinMaxCurve(6f, 14f);
+        main.startSize     = new ParticleSystem.MinMaxCurve(0.3f, 1.0f);
+        main.stopAction    = ParticleSystemStopAction.Destroy;
+        main.gravityModifier = new ParticleSystem.MinMaxCurve(0.4f);
+
+        // Blue-white water colour
+        var grad = new ParticleSystem.MinMaxGradient(
+            new Color(0.7f, 0.9f, 1.0f),
+            new Color(1.0f, 1.0f, 1.0f));
+        main.startColor = grad;
+
+        var emission = ps.emission;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 40) });
+
+        // Spread outward in a hemisphere
+        var shape = ps.shape;
+        shape.enabled     = true;
+        shape.shapeType   = ParticleSystemShapeType.Hemisphere;
+        shape.radius      = 1.5f;
+        shape.radiusThickness = 1f;
+
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
+        if (shader != null) renderer.material = new Material(shader);
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    static GameObject CreateVolcanoStonePrefab(GameObject splashPrefab, Material stoneMat)
+    {
+        string path = "Assets/Prefabs/VolcanoStone.prefab";
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "VolcanoStone";
+        go.transform.localScale = new Vector3(1.4f, 1.1f, 1.4f);
+
+        if (stoneMat != null)
+            go.GetComponent<MeshRenderer>().sharedMaterial = stoneMat;
+
+        // Remove physics collider — collision handled in script via distance check
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+
+        var script = go.AddComponent<VolcanoStone>();
+        script.splashPrefab = splashPrefab;
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Torpedo prefab
     // -------------------------------------------------------------------------
 
     static GameObject CreateTorpedoPrefab(GameObject explosionPrefab, Material torpedoMat)
@@ -479,7 +547,8 @@ public static class GameSetup
 
     static void BuildGameScene(
         System.Collections.Generic.Dictionary<string, Material> mats,
-        GameObject torpedoPrefab)
+        GameObject torpedoPrefab,
+        GameObject stonePrefab)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -534,7 +603,7 @@ public static class GameSetup
 
         // Level 4: Volcano — central volcano island matching Level 3 scale
         var islands4RootGO = new GameObject("Level4_Volcano");
-        CreateVulcanoIsland(Vector3.zero, 33.6f, mats, islands4RootGO.transform);
+        CreateVulcanoIsland(Vector3.zero, 33.6f, mats, stonePrefab, islands4RootGO.transform);
         float[] rockAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
         foreach (float angle in rockAngles)
         {
@@ -800,6 +869,7 @@ public static class GameSetup
     // Creates the Level 4 volcano island using Vulcano.fbx scaled to match Level 3
     static void CreateVulcanoIsland(Vector3 pos, float targetRadius,
         System.Collections.Generic.Dictionary<string, Material> mats,
+        GameObject stonePrefab,
         Transform parent = null)
     {
         var island = new GameObject("Island");
@@ -807,6 +877,9 @@ public static class GameSetup
         island.transform.position = pos;
         island.tag = "Island";
         island.AddComponent<IslandData>().radius = targetRadius * 0.8f;
+
+        var eruption = island.AddComponent<VolcanoEruption>();
+        eruption.stonePrefab = stonePrefab;
 
         // Invisible capsule collider so torpedoes register hits
         var cap = island.AddComponent<CapsuleCollider>();

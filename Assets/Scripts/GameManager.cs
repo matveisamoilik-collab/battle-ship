@@ -30,7 +30,7 @@ public class GameManager : MonoBehaviour
     public GameObject botShipPrefab;
 
     private const float SurvivalDuration = 120f;
-    private const float SpawnInterval    = 24f;
+    private const float SpawnInterval    = 11f;
 
     private bool  gameOver = false;
     public  bool  IsGameOver  => gameOver;
