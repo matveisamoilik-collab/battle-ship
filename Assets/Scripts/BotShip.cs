@@ -37,7 +37,7 @@ public class BotShip : MonoBehaviour
     void Start()
     {
         int level    = GameManager.Instance != null ? GameManager.Instance.PlayingLevel : 1;
-        bool isBlack = level == 1;
+        bool isBlack = level == 1 || level == 4;
         bool isPirat = level == 3;
 
         ShipStats stats = isBlack ? ShipData.Black : (isPirat ? ShipData.Pirate : ShipData.Blue);
@@ -293,6 +293,6 @@ public class BotShip : MonoBehaviour
         currentHP = Mathf.Max(0f, currentHP);
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
         if (currentHP <= 0f && GameManager.Instance != null)
-            GameManager.Instance.BotDefeated();
+            GameManager.Instance.BotDefeated(this);
     }
 }

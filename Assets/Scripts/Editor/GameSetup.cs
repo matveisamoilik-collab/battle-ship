@@ -77,6 +77,7 @@ public static class GameSetup
         EnsureFolder("Assets", "Models");
         EnsureFolder("Assets/Models", "IslandWithSkull");
         EnsureFolder("Assets/Models", "PiratShip");
+        EnsureFolder("Assets/Models", "Vulcano");
     }
 
     static void EnsureFolder(string parent, string child)
@@ -233,7 +234,7 @@ public static class GameSetup
         string srcDir = System.IO.Path.Combine(projectRoot, "images");
         string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4" })
         {
             string src = System.IO.Path.Combine(srcDir, lvl + ".png");
             string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
@@ -245,7 +246,7 @@ public static class GameSetup
 
         AssetDatabase.Refresh();
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4" })
         {
             string assetPath = "Assets/Resources/" + lvl + ".png";
             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -306,6 +307,26 @@ public static class GameSetup
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             Debug.Log("[ShipButtlr] islandWithSkull.fbx imported with external materials.");
         }
+
+        // Vulcano model (Level 4 island)
+        string vulcanoSrc   = System.IO.Path.Combine(projectRoot, "3d", "island", "Vulcano.fbx");
+        string vulcanoAsset = "Assets/Models/Vulcano/Vulcano.fbx";
+        string vulcanoDst   = System.IO.Path.Combine(Application.dataPath, "Models", "Vulcano", "Vulcano.fbx");
+        if (System.IO.File.Exists(vulcanoSrc))
+        {
+            System.IO.File.Copy(vulcanoSrc, vulcanoDst, overwrite: true);
+            AssetDatabase.Refresh();
+            var vulcanoImporter = AssetImporter.GetAtPath(vulcanoAsset) as ModelImporter;
+            if (vulcanoImporter != null)
+            {
+                vulcanoImporter.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
+                vulcanoImporter.materialLocation   = ModelImporterMaterialLocation.External;
+                AssetDatabase.ImportAsset(vulcanoAsset, ImportAssetOptions.ForceUpdate);
+            }
+            Debug.Log("[ShipButtlr] Vulcano.fbx imported.");
+        }
+        else
+            Debug.LogWarning("[ShipButtlr] Vulcano.fbx not found at: " + vulcanoSrc);
     }
 
     // -------------------------------------------------------------------------
@@ -510,6 +531,10 @@ public static class GameSetup
         // Level 3: Skull Shoals — one massive central island with skull model + 6 rock sentinels
         var islands3RootGO = new GameObject("Islands3Root");
         CreateSkullIsland(Vector3.zero, 33.6f, mats, islands3RootGO.transform);
+
+        // Level 4: Volcano — central volcano island matching Level 3 scale
+        var islands4RootGO = new GameObject("Islands4Root");
+        CreateVulcanoIsland(Vector3.zero, 33.6f, mats, islands4RootGO.transform);
         float[] rockAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
         foreach (float angle in rockAngles)
         {
@@ -586,7 +611,7 @@ public static class GameSetup
             new Vector2(0f, 0f), new Vector2(0f, 0f),
             new Vector2(20f, 20f), new Vector2(220f, 50f));
 
-        // Bot HP bar — top-right
+        // Bot HP bar — top-right (hidden at runtime for Level 4)
         HealthBar botHealthBar = CreateHPBar(
             "BotHP", hudGO.transform,
             "ENEMY SHIP", new Color(1f, 0.3f, 0.3f),
@@ -596,6 +621,10 @@ public static class GameSetup
         // Wire health bars to ships
         playerShip.healthBar = playerHealthBar;
         botShip.healthBar    = botHealthBar;
+
+        // BotShip prefab — used by GameManager to spawn extra ships in Level 4
+        var botShipPrefabGO = CreateBotShipPrefab(mats["Bot"], torpedoPrefab,
+            AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/PiratShip/pirat_ship.fbx"));
 
         // ----- End Panel -----
         var endPanelGO = BuildEndPanel(hudGO.transform);
@@ -637,6 +666,9 @@ public static class GameSetup
         gm.coinsText    = coinGO.GetComponent<Text>();
         gm.islandsRoot  = islandsRootGO;
         gm.islands3Root = islands3RootGO;
+        gm.islands4Root  = islands4RootGO;
+        gm.botHPGroup    = botHealthBar.transform.parent.gameObject; // "BotHP" group
+        gm.botShipPrefab = botShipPrefabGO;
 
         // Level display — below coins, top-left HUD
         var levelGO = MakeText("LevelText", hudGO.transform, "LEVEL: 1", 30, Color.black);
@@ -648,6 +680,17 @@ public static class GameSetup
         levelRT.sizeDelta        = new Vector2(300f, 50f);
         levelGO.GetComponent<Text>().alignment = TextAnchor.UpperLeft;
         gm.levelText = levelGO.GetComponent<Text>();
+
+        // Survival timer — top-center, hidden for non-Level-4 levels
+        var timerGO = MakeText("TimerText", hudGO.transform, "2:00", 48, Color.white);
+        var timerRT = timerGO.GetComponent<RectTransform>();
+        timerRT.anchorMin        = new Vector2(0.5f, 1f);
+        timerRT.anchorMax        = new Vector2(0.5f, 1f);
+        timerRT.pivot            = new Vector2(0.5f, 1f);
+        timerRT.anchoredPosition = new Vector2(0f, -15f);
+        timerRT.sizeDelta        = new Vector2(200f, 70f);
+        timerGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+        gm.timerText  = timerGO.GetComponent<Text>();
 
         // ----- Mobile Controls -----
         var circleSprite = MakeCircleSprite();
@@ -737,6 +780,84 @@ public static class GameSetup
         go.transform.position = pos;
         var col = go.AddComponent<BoxCollider>();
         col.size = size;
+    }
+
+    // Creates a BotShip prefab for Level 4 dynamic spawning (no health bar)
+    static GameObject CreateBotShipPrefab(Material botMat, GameObject torpedoPrefab, GameObject piratModel)
+    {
+        string path = "Assets/Prefabs/BotShip.prefab";
+        var go = BuildShipGO("BotShip", Vector3.zero, Quaternion.identity, botMat);
+        go.tag = "Enemy";
+        var bot = go.AddComponent<BotShip>();
+        bot.torpedoPrefab     = torpedoPrefab;
+        bot.torpedoSpawnPoint = go.transform.Find("TorpedoSpawn");
+        if (piratModel != null) bot.piratShipModel = piratModel;
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    // Creates the Level 4 volcano island using Vulcano.fbx scaled to match Level 3
+    static void CreateVulcanoIsland(Vector3 pos, float targetRadius,
+        System.Collections.Generic.Dictionary<string, Material> mats,
+        Transform parent = null)
+    {
+        var island = new GameObject("Island");
+        if (parent != null) island.transform.SetParent(parent);
+        island.transform.position = pos;
+        island.tag = "Island";
+        island.AddComponent<IslandData>().radius = targetRadius * 0.8f;
+
+        // Invisible capsule collider so torpedoes register hits
+        var cap = island.AddComponent<CapsuleCollider>();
+        cap.radius = targetRadius * 0.8f;
+        cap.height = 30f;
+        cap.center = new Vector3(0f, 15f, 0f);
+
+        var vulcanoPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/Vulcano/Vulcano.fbx");
+        if (vulcanoPrefab == null)
+        {
+            Debug.LogWarning("[ShipButtlr] Vulcano.fbx not found — run Build All again after Unity imports it.");
+            return;
+        }
+
+        var modelGO = (GameObject)PrefabUtility.InstantiatePrefab(vulcanoPrefab);
+        modelGO.name = "VulcanoModel";
+        modelGO.transform.localEulerAngles = new Vector3(-90f, 0f, 0f); // Blender Z-up → Unity Y-up
+        modelGO.transform.localScale       = Vector3.one;
+
+        // Measure world-space AABB
+        Bounds wb = new Bounds();
+        bool hasMesh = false;
+        foreach (var mf in modelGO.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf.sharedMesh == null) continue;
+            var b = mf.sharedMesh.bounds;
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                var wc = mf.transform.TransformPoint(
+                    b.center + Vector3.Scale(b.extents, new Vector3(sx, sy, sz)));
+                if (!hasMesh) { wb = new Bounds(wc, Vector3.zero); hasMesh = true; }
+                else wb.Encapsulate(wc);
+            }
+        }
+
+        float xzExtent = Mathf.Max(wb.size.x, wb.size.z);
+        float target   = targetRadius * 1.6f;
+        float s        = (hasMesh && xzExtent > 0.0001f) ? target / xzExtent : 1f;
+        float localY   = -wb.min.y * s;
+
+        Debug.Log($"[ShipButtlr] Vulcano: bounds={wb.size} xzExtent={xzExtent:F3} scale={s:F3} localY={localY:F3}");
+
+        modelGO.transform.SetParent(island.transform, false);
+        modelGO.transform.localPosition    = new Vector3(0f, localY, 0f);
+        modelGO.transform.localScale       = new Vector3(s, s, s);
+        modelGO.transform.localEulerAngles = new Vector3(-90f, 0f, 0f);
+
+        foreach (var col in modelGO.GetComponentsInChildren<Collider>())
+            Object.DestroyImmediate(col);
     }
 
     static void CreateIsland(Vector3 pos, float radius, int treeCount,
@@ -1159,6 +1280,17 @@ public static class GameSetup
         isle3RT.offsetMin = Vector2.zero;
         isle3RT.offsetMax = Vector2.zero;
 
+        // Island 4 — Volcano (locked until CurrentLevel >= 4)
+        var isle4GO = new GameObject("Island4Button");
+        isle4GO.transform.SetParent(panel.transform, false);
+        isle4GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+        var isle4Btn = isle4GO.AddComponent<Button>();
+        var isle4RT  = isle4GO.GetComponent<RectTransform>();
+        isle4RT.anchorMin = new Vector2(0.55f, 0.55f);
+        isle4RT.anchorMax = new Vector2(0.70f, 0.70f);
+        isle4RT.offsetMin = Vector2.zero;
+        isle4RT.offsetMax = Vector2.zero;
+
         // Close button — top-right corner
         var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
         var closeRT    = closeBtnGO.GetComponent<RectTransform>();
@@ -1172,11 +1304,13 @@ public static class GameSetup
         script.mapImage      = mapImg;
         script.island2Button = isle2Btn;
         script.island3Button = isle3Btn;
+        script.island4Button = isle4Btn;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
         UnityEventTools.AddPersistentListener(isle2Btn.onClick, script.OnIsland2Clicked);
         UnityEventTools.AddPersistentListener(isle3Btn.onClick, script.OnIsland3Clicked);
+        UnityEventTools.AddPersistentListener(isle4Btn.onClick, script.OnIsland4Clicked);
         UnityEventTools.AddPersistentListener(
             closeBtnGO.GetComponent<Button>().onClick,
             script.OnCloseMapClicked);

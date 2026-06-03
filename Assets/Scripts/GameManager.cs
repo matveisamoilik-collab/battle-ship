@@ -21,13 +21,24 @@ public class GameManager : MonoBehaviour
     [Header("Level")]
     public GameObject islandsRoot;
     public GameObject islands3Root;
+    public GameObject islands4Root;
     public Text levelText;
 
-    private bool gameOver = false;
-    public bool IsGameOver => gameOver;
-    public int  PlayingLevel => playingLevel;
-    private int playingLevel;
-    private bool wonLastGame;
+    [Header("Level 4")]
+    public Text       timerText;
+    public GameObject botHPGroup;
+    public GameObject botShipPrefab;
+
+    private const float SurvivalDuration = 120f;
+    private const float SpawnInterval    = 24f;
+
+    private bool  gameOver = false;
+    public  bool  IsGameOver  => gameOver;
+    public  int   PlayingLevel => playingLevel;
+    private int   playingLevel;
+    private bool  wonLastGame;
+    private float survivalTimer;
+    private float spawnTimer;
 
     void Awake()
     {
@@ -45,6 +56,7 @@ public class GameManager : MonoBehaviour
 
         if (islandsRoot  != null) islandsRoot.SetActive(playingLevel == 2);
         if (islands3Root != null) islands3Root.SetActive(playingLevel == 3);
+        if (islands4Root != null) islands4Root.SetActive(playingLevel == 4);
     }
 
     void Start()
@@ -52,6 +64,97 @@ public class GameManager : MonoBehaviour
         UpdateCoinsText();
         if (levelText != null)
             levelText.text = "LEVEL: " + playingLevel;
+
+        if (playingLevel == 4)
+        {
+            survivalTimer = SurvivalDuration;
+            spawnTimer    = SpawnInterval;
+            if (botHPGroup != null) botHPGroup.SetActive(false);
+            if (timerText  != null)
+            {
+                timerText.gameObject.SetActive(true);
+                UpdateTimerUI();
+            }
+        }
+        else
+        {
+            if (timerText != null) timerText.gameObject.SetActive(false);
+        }
+    }
+
+    void Update()
+    {
+        if (playingLevel != 4 || gameOver) return;
+
+        survivalTimer -= Time.deltaTime;
+        spawnTimer    -= Time.deltaTime;
+        UpdateTimerUI();
+
+        if (survivalTimer <= 0f)
+        {
+            // Destroy all remaining bots before showing victory
+            foreach (var bot in FindObjectsByType<BotShip>(FindObjectsSortMode.None))
+                if (bot != null) Destroy(bot.gameObject);
+            TriggerVictory();
+            return;
+        }
+
+        if (spawnTimer <= 0f)
+        {
+            SpawnBlackShip();
+            spawnTimer = SpawnInterval;
+        }
+    }
+
+    void UpdateTimerUI()
+    {
+        if (timerText == null) return;
+        int secs = Mathf.CeilToInt(Mathf.Max(0f, survivalTimer));
+        timerText.text = string.Format("{0}:{1:00}", secs / 60, secs % 60);
+    }
+
+    void SpawnBlackShip()
+    {
+        if (botShipPrefab == null) return;
+        Vector3 pos   = GetSpawnPosition();
+        float   angle = Mathf.Atan2(pos.x, pos.z) * Mathf.Rad2Deg + 180f; // bow toward center
+        Instantiate(botShipPrefab, pos, Quaternion.Euler(0f, angle, 0f));
+    }
+
+    Vector3 GetSpawnPosition()
+    {
+        GameObject playerGO = GameObject.FindWithTag("Player");
+        Vector3    playerPos = playerGO != null ? new Vector3(playerGO.transform.position.x, 0f, playerGO.transform.position.z) : Vector3.zero;
+
+        Vector3 pos = Vector3.zero;
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            float a    = Random.Range(0f, Mathf.PI * 2f);
+            float dist = Random.Range(65f, 82f);
+            pos = new Vector3(Mathf.Sin(a) * dist, 0f, Mathf.Cos(a) * dist);
+            pos.x = Mathf.Clamp(pos.x, -90f, 90f);
+            pos.z = Mathf.Clamp(pos.z, -90f, 90f);
+            if (Vector3.Distance(pos, playerPos) >= 30f) break;
+        }
+        return pos;
+    }
+
+    void TriggerVictory()
+    {
+        if (gameOver) return;
+        gameOver    = true;
+        wonLastGame = true;
+        CoinManager.Instance?.AddCoins(20);
+        UpdateCoinsText();
+
+        int stored = PlayerPrefs.GetInt("CurrentLevel", 1);
+        if (stored < playingLevel + 1 && stored < 4)
+        {
+            PlayerPrefs.SetInt("CurrentLevel", playingLevel + 1);
+            PlayerPrefs.Save();
+        }
+
+        ShowEndPanel("VICTORY!");
     }
 
     void UpdateCoinsText()
@@ -69,29 +172,22 @@ public class GameManager : MonoBehaviour
         ShowEndPanel("DEFEATED");
     }
 
-    public void BotDefeated()
+    public void BotDefeated(BotShip bot)
     {
-        if (gameOver) return;
-        gameOver = true;
-        wonLastGame = true;
-        CoinManager.Instance?.AddCoins(20);
-        UpdateCoinsText();
-
-        int stored = PlayerPrefs.GetInt("CurrentLevel", 1);
-        if (stored < playingLevel + 1 && stored < 3)
+        if (playingLevel == 4)
         {
-            PlayerPrefs.SetInt("CurrentLevel", playingLevel + 1);
-            PlayerPrefs.Save();
+            // In Level 4 bots respawn — just remove the destroyed ship
+            if (bot != null) Destroy(bot.gameObject);
+            return;
         }
-
-        ShowEndPanel("VICTORY!");
+        TriggerVictory();
     }
 
     void ShowEndPanel(string message)
     {
         ShakeCamera(0.5f, 0.4f);
         if (resultText != null) resultText.text = message;
-        if (endPanel != null) endPanel.SetActive(true);
+        if (endPanel   != null) endPanel.SetActive(true);
         Time.timeScale = 0f;
     }
 
@@ -104,7 +200,7 @@ public class GameManager : MonoBehaviour
     public void PlayAgain()
     {
         Time.timeScale = 1f;
-        MainMenu.levelToPlay = wonLastGame && playingLevel < 3 ? playingLevel + 1 : playingLevel;
+        MainMenu.levelToPlay = wonLastGame && playingLevel < 4 ? playingLevel + 1 : playingLevel;
         SceneManager.LoadScene("GameScene");
     }
 

@@ -43,6 +43,7 @@ public class MainMenu : MonoBehaviour
     public Image      mapImage;
     public Button     island2Button;
     public Button     island3Button;
+    public Button     island4Button;
 
     private static readonly string[] s_validPromoCodes =
         { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8" };
@@ -316,10 +317,10 @@ public class MainMenu : MonoBehaviour
     public void OnMapClicked()
     {
         RefreshMapImage();
-        if (island2Button != null)
-            island2Button.interactable = PlayerPrefs.GetInt("CurrentLevel", 1) >= 2;
-        if (island3Button != null)
-            island3Button.interactable = PlayerPrefs.GetInt("CurrentLevel", 1) >= 3;
+        int lvl = PlayerPrefs.GetInt("CurrentLevel", 1);
+        if (island2Button != null) island2Button.interactable = lvl >= 2;
+        if (island3Button != null) island3Button.interactable = lvl >= 3;
+        if (island4Button != null) island4Button.interactable = lvl >= 4;
         if (mapPanel != null) mapPanel.SetActive(true);
     }
 
@@ -346,11 +347,20 @@ public class MainMenu : MonoBehaviour
         SceneManager.LoadScene("GameScene");
     }
 
+    public void OnIsland4Clicked()
+    {
+        levelToPlay = 4;
+        SceneManager.LoadScene("GameScene");
+    }
+
     void RefreshMapImage()
     {
         if (mapImage == null) return;
         int lvl = PlayerPrefs.GetInt("CurrentLevel", 1);
-        string spriteName = lvl >= 3 ? "Level_3" : lvl >= 2 ? "Level_2" : "Level_1";
+        string spriteName = lvl >= 4 ? "Level_4"
+                          : lvl >= 3 ? "Level_3"
+                          : lvl >= 2 ? "Level_2"
+                                     : "Level_1";
         var sprite = Resources.Load<Sprite>(spriteName);
         if (sprite != null) mapImage.sprite = sprite;
     }

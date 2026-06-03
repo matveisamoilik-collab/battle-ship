@@ -198,10 +198,12 @@ Both ships move via direct `transform.position +=` — Unity physics does not ru
 
 Two levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key (highest unlocked level — never decreases).
 
-- **Level 1** — open water: all 6 islands are parented under an `IslandsRoot` GameObject. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. This runs before any `Start()`, so `FindObjectsOfType<IslandData>()` in ship scripts returns an empty array — island collision is a no-op.
-- **Level 2** — existing map: `IslandsRoot` stays active; islands behave as before.
-- **Progression**: `GameManager.BotDefeated()` advances `"CurrentLevel"` from 1 → 2 on a win (capped at 2, reads PlayerPrefs). Loss never changes the level.
-- **Play Again after win**: advances to `playingLevel + 1` (capped at 2). Play Again after loss replays the same level.
+- **Level 1** — open water, black bot ship: all 6 islands are parented under `IslandsRoot`. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. Island collision is a no-op.
+- **Level 2** — island map, blue bot ship: `IslandsRoot` active; islands behave as before.
+- **Level 3** — Skull Shoals, pirate bot ship: `Islands3Root` active; one skull island + 6 rocks.
+- **Level 4** — Volcano, survival mode: `Islands4Root` active; central Vulcano.fbx island. **Win condition: survive 120 s without dying.** One black ship spawns at game start (the scene's BotShip); an additional black ship spawns every 24 s (up to 5 total). Bots that are destroyed are simply removed — no game over. A countdown timer (`TimerText`, 48pt white bold, top-centre HUD) is shown; the bot HP bar is hidden. When the timer hits 0, all remaining bots are destroyed and `TriggerVictory()` is called.
+- **Progression**: `TriggerVictory()` (and `BotDefeated()` for levels 1-3) advances `"CurrentLevel"` by 1, capped at 4. Loss never changes the level.
+- **Play Again after win**: advances to `playingLevel + 1` (capped at 4). Play Again after loss replays the same level.
 - **UI**: A `"LEVEL: X"` text (black, 30pt) sits below the coin counter (top-left, anchoredPosition `(20, -75)`) on both the MainMenu canvas (`MainMenu.levelText`) and the GameScene HUD (`GameManager.levelText`). GameManager sets it from `playingLevel` in `Start()`.
 - **Coin text color**: yellow (`Color.yellow`) on both canvases. **Level text color**: black (`Color.black`).
 

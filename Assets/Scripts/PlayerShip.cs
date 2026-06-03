@@ -25,7 +25,8 @@ public class PlayerShip : MonoBehaviour
     private float torpedoDamage;
     private float lastFireTime;
     private IslandData[] islands;
-    private Transform enemy;
+    private BotShip[] enemies;
+    private float nextEnemyRefresh;
     private float lastShakeTime = -999f;
 
     void Start()
@@ -33,9 +34,14 @@ public class PlayerShip : MonoBehaviour
         currentHP = maxHP;
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
-        var enemyGO = GameObject.FindWithTag("Enemy");
-        if (enemyGO != null) enemy = enemyGO.transform;
+        RefreshEnemyList();
         ApplySelectedShip();
+    }
+
+    void RefreshEnemyList()
+    {
+        enemies = FindObjectsByType<BotShip>(FindObjectsSortMode.None);
+        nextEnemyRefresh = Time.time + 1f;
     }
 
     void ApplySelectedShip()
@@ -153,7 +159,10 @@ public class PlayerShip : MonoBehaviour
         pos.y = 0f;
         transform.position = pos;
         transform.position = PushOutOfIslands(transform.position);
-        transform.position = PushOutOfShip(transform.position, enemy);
+        if (Time.time > nextEnemyRefresh) RefreshEnemyList();
+        foreach (var bot in enemies)
+            if (bot != null)
+                transform.position = PushOutOfShip(transform.position, bot.transform);
     }
 
     void TryShake()
