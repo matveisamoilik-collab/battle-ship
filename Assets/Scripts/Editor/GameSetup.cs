@@ -106,6 +106,8 @@ public static class GameSetup
         dict["TreeLeaves"] = MakeMat("TreeLeavesMaterial", new Color(0.15f, 0.45f, 0.15f));
         dict["Volcanic"]   = MakeMat("VolcanicMaterial",   new Color(0.18f, 0.12f, 0.10f));
         dict["Stone"]      = MakeMat("StoneMaterial",      new Color(0.38f, 0.38f, 0.40f));
+        dict["Cloud"]      = MakeMat("CloudMaterial",      new Color(0.90f, 0.90f, 0.92f));
+        dict["CloudDark"]  = MakeMat("CloudDarkMaterial",  new Color(0.50f, 0.50f, 0.53f));
         return dict;
     }
 
@@ -564,6 +566,7 @@ public static class GameSetup
         string skyboxPath = "Assets/Materials/SkyboxMaterial.mat";
         var existingSky = AssetDatabase.LoadAssetAtPath<Material>(skyboxPath);
         if (existingSky != null) AssetDatabase.DeleteAsset(skyboxPath);
+        Material l4SkyboxMat = null;
         var skyboxShader = Shader.Find("Skybox/Procedural");
         if (skyboxShader != null)
         {
@@ -580,6 +583,18 @@ public static class GameSetup
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
             RenderSettings.sun         = light;
             DynamicGI.UpdateEnvironment();
+
+            // Level 4 cloudy daytime sky — gray overcast, no sun visible
+            string l4SkyboxPath = "Assets/Materials/SkyboxMaterial_L4.mat";
+            var existingL4 = AssetDatabase.LoadAssetAtPath<Material>(l4SkyboxPath);
+            if (existingL4 != null) AssetDatabase.DeleteAsset(l4SkyboxPath);
+            l4SkyboxMat = new Material(skyboxShader);
+            l4SkyboxMat.SetInt(  "_SunDisk",             0);                               // no visible sun
+            l4SkyboxMat.SetFloat("_AtmosphereThickness", 1.3f);                           // slight extra haze
+            l4SkyboxMat.SetColor("_SkyTint",             new Color(0.50f, 0.50f, 0.50f)); // neutral gray
+            l4SkyboxMat.SetColor("_GroundColor",         new Color(0.30f, 0.30f, 0.30f)); // medium gray ground
+            l4SkyboxMat.SetFloat("_Exposure",            1.2f);                           // normal daytime brightness
+            AssetDatabase.CreateAsset(l4SkyboxMat, l4SkyboxPath);
         }
 
         // Sea plane (Plane primitive = 10×10 units; scale 200 = 2000×2000, covers the full horizon)
@@ -611,6 +626,32 @@ public static class GameSetup
             var rockPos  = new Vector3(Mathf.Sin(rad) * 71f, 0f, Mathf.Cos(rad) * 71f);
             var rockRng  = new System.Random((int)(angle * 137 + 42));
             CreateRock(rockPos, rockRng, mats, islands3RootGO.transform);
+        }
+
+        // Level 4 clouds — 16 clouds orbiting the volcano at the same linear speed
+        const float CloudLinearSpeed = 10.5f; // units per second
+        var cloudsRootGO = new GameObject("Level4_Clouds");
+        var cloudRng = new System.Random(7);
+        // Central dark cloud — stationary over the volcano mouth (stones spawn at y≈13.5)
+        CreateCloud(0f, 0f, 0f, 22f, cloudsRootGO.transform, scale: 1.3f, selfRotateSpeed: 6f);
+
+        // Inner ring — close to the volcano
+        for (int i = 0; i < 14; i++)
+        {
+            float radius     = (float)(cloudRng.NextDouble() * 35f + 15f);      // 15–50 units from center
+            float height     = 28f + (float)(cloudRng.NextDouble() * 18f);
+            float speed      = CloudLinearSpeed / radius * Mathf.Rad2Deg;
+            float startAngle = (float)(cloudRng.NextDouble() * 360f);
+            CreateCloud(radius, speed, startAngle, height, cloudsRootGO.transform);
+        }
+        // Outer ring
+        for (int i = 0; i < 28; i++)
+        {
+            float radius     = (float)(cloudRng.NextDouble() * 100f + 50f);     // 50–150 units from center
+            float height     = 28f + (float)(cloudRng.NextDouble() * 18f);
+            float speed      = CloudLinearSpeed / radius * Mathf.Rad2Deg;
+            float startAngle = (float)(cloudRng.NextDouble() * 360f);
+            CreateCloud(radius, speed, startAngle, height, cloudsRootGO.transform);
         }
 
         // Invisible boundary walls (BoxCollider only, tagged "Wall")
@@ -738,6 +779,9 @@ public static class GameSetup
         gm.islands4Root  = islands4RootGO;
         gm.botHPGroup    = botHealthBar.transform.parent.gameObject; // "BotHP" group
         gm.botShipPrefab = botShipPrefabGO;
+        gm.cloudySkybox      = l4SkyboxMat;
+        gm.directionalLight  = light;
+        gm.cloudsRoot    = cloudsRootGO;
 
         // Level display — below coins, top-left HUD
         var levelGO = MakeText("LevelText", hudGO.transform, "LEVEL: 1", 30, Color.black);
@@ -849,6 +893,51 @@ public static class GameSetup
         go.transform.position = pos;
         var col = go.AddComponent<BoxCollider>();
         col.size = size;
+    }
+
+    static readonly Color s_cloudDark  = new Color(0.50f, 0.50f, 0.53f);
+    static readonly Color s_cloudLight = new Color(0.90f, 0.90f, 0.92f);
+    const float CloudMaxRadius = 150f;
+
+    static GameObject CreateCloud(float orbitRadius, float orbitSpeed, float orbitAngle, float height, Transform parent, float scale = 1f, float selfRotateSpeed = 0f)
+    {
+        float rad = orbitAngle * Mathf.Deg2Rad;
+        var pos = new Vector3(Mathf.Sin(rad) * orbitRadius, height, Mathf.Cos(rad) * orbitRadius);
+
+        var root = new GameObject("Cloud");
+        root.transform.parent   = parent;
+        root.transform.position = pos;
+
+        var drifter = root.AddComponent<CloudDrifter>();
+        drifter.orbitRadius      = orbitRadius;
+        drifter.orbitSpeed       = orbitSpeed;
+        drifter.orbitAngle       = orbitAngle;
+        drifter.orbitHeight      = height;
+        drifter.selfRotateSpeed  = selfRotateSpeed;
+
+        float t   = Mathf.Clamp01(orbitRadius / CloudMaxRadius);
+        Color col = Color.Lerp(s_cloudDark, s_cloudLight, t);
+        var mat   = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        mat.SetColor("_BaseColor", col);
+
+        // 4 overlapping spheres forming a puffy cloud silhouette
+        (Vector3 offset, Vector3 puffScale)[] puffs =
+        {
+            (new Vector3(  0f, 0f, 0f), new Vector3(22f, 10f, 15f)),
+            (new Vector3(-12f, 2f, 0f), new Vector3(15f,  9f, 12f)),
+            (new Vector3( 12f, 2f, 0f), new Vector3(15f,  9f, 12f)),
+            (new Vector3(  0f, 7f, 0f), new Vector3(13f,  8f, 11f)),
+        };
+        foreach (var (offset, puffScale) in puffs)
+        {
+            var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Object.DestroyImmediate(sphere.GetComponent<SphereCollider>());
+            sphere.transform.parent        = root.transform;
+            sphere.transform.localPosition = offset * scale;
+            sphere.transform.localScale    = puffScale * scale;
+            sphere.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+        return root;
     }
 
     // Creates a BotShip prefab for Level 4 dynamic spawning (no health bar)

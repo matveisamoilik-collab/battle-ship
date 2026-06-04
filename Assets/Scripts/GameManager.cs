@@ -28,6 +28,9 @@ public class GameManager : MonoBehaviour
     public Text       timerText;
     public GameObject botHPGroup;
     public GameObject botShipPrefab;
+    public Material   cloudySkybox;
+    public GameObject cloudsRoot;
+    public Light      directionalLight;
 
     private const float SurvivalDuration = 90f;
     private const float SpawnInterval    = 18f;
@@ -57,6 +60,7 @@ public class GameManager : MonoBehaviour
         if (islandsRoot  != null) islandsRoot.SetActive(playingLevel == 2);
         if (islands3Root != null) islands3Root.SetActive(playingLevel == 3);
         if (islands4Root != null) islands4Root.SetActive(playingLevel == 4);
+        if (cloudsRoot   != null) cloudsRoot.SetActive(playingLevel == 4);
     }
 
     void Start()
@@ -67,6 +71,16 @@ public class GameManager : MonoBehaviour
 
         if (playingLevel == 4)
         {
+            if (cloudySkybox != null)
+            {
+                RenderSettings.skybox = cloudySkybox;
+                DynamicGI.UpdateEnvironment();
+            }
+            if (directionalLight != null)
+            {
+                directionalLight.intensity = 0.5f;
+                directionalLight.color     = new Color(0.75f, 0.78f, 0.85f); // cool gray overcast
+            }
             survivalTimer = SurvivalDuration;
             spawnTimer    = SpawnInterval;
             if (botHPGroup != null) botHPGroup.SetActive(false);
