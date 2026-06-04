@@ -25,6 +25,10 @@ public class MainMenu : MonoBehaviour
     public Button     yellowRedShipSelectButton;
     public Text       yellowRedShipSelectedLabel;
 
+    public GameObject whiteShipBoughtCard;
+    public Button     whiteShipSelectButton;
+    public Text       whiteShipSelectedLabel;
+
     public GameObject piratShipToBuyCard;
     public GameObject piratShipBoughtCard;
     public Button     buyPiratShipButton;
@@ -46,7 +50,7 @@ public class MainMenu : MonoBehaviour
     public Button     island4Button;
 
     private static readonly string[] s_validPromoCodes =
-        { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8" };
+        { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8","godship" };
     private const int PromoCodeReward = 5;
 
     void Start()
@@ -137,6 +141,13 @@ public class MainMenu : MonoBehaviour
         if (yellowRedShipSelectButton  != null) yellowRedShipSelectButton.gameObject.SetActive(yellowRedOwned && !yellowRedSelected);
         if (yellowRedShipSelectedLabel != null) yellowRedShipSelectedLabel.gameObject.SetActive(yellowRedOwned && yellowRedSelected);
 
+        bool whiteOwned    = PlayerPrefs.GetInt("WhiteShipOwned", 0) == 1;
+        bool whiteSelected = selected == "white";
+
+        if (whiteShipBoughtCard    != null) whiteShipBoughtCard.SetActive(whiteOwned);
+        if (whiteShipSelectButton  != null) whiteShipSelectButton.gameObject.SetActive(whiteOwned && !whiteSelected);
+        if (whiteShipSelectedLabel != null) whiteShipSelectedLabel.gameObject.SetActive(whiteOwned && whiteSelected);
+
         bool piratOwned    = PlayerPrefs.GetInt("PiratShipOwned", 0) == 1;
         bool piratSelected = selected == "pirat";
 
@@ -169,6 +180,13 @@ public class MainMenu : MonoBehaviour
     public void OnSelectYellowRedShip()
     {
         PlayerPrefs.SetString("SelectedShip", "yellowred");
+        PlayerPrefs.Save();
+        RefreshShopUI();
+    }
+
+    public void OnSelectWhiteShip()
+    {
+        PlayerPrefs.SetString("SelectedShip", "white");
         PlayerPrefs.Save();
         RefreshShopUI();
     }
@@ -233,7 +251,8 @@ public class MainMenu : MonoBehaviour
         if (code == "resett")
         {
             int refunded = 0;
-            bool pizza1WasReset = false;
+            bool pizza1WasReset   = false;
+            bool godshipWasReset  = false;
             foreach (var c in s_validPromoCodes)
             {
                 string key = "Promo_" + c;
@@ -242,13 +261,20 @@ public class MainMenu : MonoBehaviour
                     CoinManager.Instance?.AddCoins(-PromoCodeReward);
                     PlayerPrefs.SetInt(key, 0);
                     refunded++;
-                    if (c == "pizza1") pizza1WasReset = true;
+                    if (c == "pizza1")  pizza1WasReset  = true;
+                    if (c == "godship") godshipWasReset = true;
                 }
             }
             if (pizza1WasReset)
             {
                 PlayerPrefs.SetInt("YellowRedShipOwned", 0);
                 if (PlayerPrefs.GetString("SelectedShip", "blue") == "yellowred")
+                    PlayerPrefs.SetString("SelectedShip", "blue");
+            }
+            if (godshipWasReset)
+            {
+                PlayerPrefs.SetInt("WhiteShipOwned", 0);
+                if (PlayerPrefs.GetString("SelectedShip", "blue") == "white")
                     PlayerPrefs.SetString("SelectedShip", "blue");
             }
             if (PlayerPrefs.GetInt("PiratShipOwned", 0) == 1)
@@ -301,6 +327,16 @@ public class MainMenu : MonoBehaviour
         if (code == "pizza1")
         {
             PlayerPrefs.SetInt("YellowRedShipOwned", 1);
+            PlayerPrefs.Save();
+            promoCodeInput.text     = "";
+            promoFeedbackText.color = Color.green;
+            promoFeedbackText.text  = $"+{PromoCodeReward} COINS + SHIP!";
+            RefreshShopUI();
+            return;
+        }
+        if (code == "godship")
+        {
+            PlayerPrefs.SetInt("WhiteShipOwned", 1);
             PlayerPrefs.Save();
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.green;

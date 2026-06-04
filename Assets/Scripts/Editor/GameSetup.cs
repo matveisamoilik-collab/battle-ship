@@ -28,11 +28,14 @@ public static class GameSetup
         var mats = CreateMaterials();
         var explosionPrefab = CreateExplosionPrefab();
         var torpedoPrefab   = CreateTorpedoPrefab(explosionPrefab, mats["Torpedo"]);
-        var splashPrefab    = CreateSplashPrefab();
-        var stonePrefab     = CreateVolcanoStonePrefab(splashPrefab, mats["Volcanic"]);
+        var splashPrefab          = CreateSplashPrefab();
+        var stonePrefab           = CreateVolcanoStonePrefab(splashPrefab, mats["Volcanic"]);
+        var lightningMarkerPrefab = CreateLightningMarkerPrefab();
+        var lightningBoltPrefab   = CreateLightningBoltPrefab();
+        var lightningEffectPrefab = CreateLightningEffectPrefab();
 
         BuildMainMenuScene();
-        BuildGameScene(mats, torpedoPrefab, stonePrefab);
+        BuildGameScene(mats, torpedoPrefab, stonePrefab, lightningMarkerPrefab, lightningBoltPrefab, lightningEffectPrefab);
         ConfigureBuildSettings();
 
         AssetDatabase.SaveAssets();
@@ -233,6 +236,114 @@ public static class GameSetup
 
         var script = go.AddComponent<VolcanoStone>();
         script.splashPrefab = splashPrefab;
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    static GameObject CreateLightningMarkerPrefab()
+    {
+        string path    = "Assets/Prefabs/LightningMarker.prefab";
+        string matPath = "Assets/Materials/LightningMarker.mat";
+
+        // Delete stale assets from previous runs
+        if (AssetDatabase.LoadAssetAtPath<Object>(path)    != null) AssetDatabase.DeleteAsset(path);
+        if (AssetDatabase.LoadAssetAtPath<Object>(matPath) != null) AssetDatabase.DeleteAsset(matPath);
+
+        // Transparent red disc material
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var mat = new Material(shader);
+        mat.SetColor("_BaseColor", new Color(1f, 0.15f, 0.15f, 0.22f));
+        mat.SetFloat("_Surface", 1f);           // Transparent
+        mat.SetFloat("_Blend", 0f);             // Alpha blend
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.renderQueue = 3000;
+        AssetDatabase.CreateAsset(mat, matPath);
+
+        // Flat cylinder — default radius 0.5, so scale 24 → world radius 12 (1 hull length)
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        go.name = "LightningMarker";
+        go.transform.localScale = new Vector3(24f, 0.025f, 24f);
+        go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        Object.DestroyImmediate(go.GetComponent<CapsuleCollider>());
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    static GameObject CreateLightningBoltPrefab()
+    {
+        string path    = "Assets/Prefabs/LightningBolt.prefab";
+        string matPath = "Assets/Materials/LightningBoltMaterial.mat";
+
+        if (AssetDatabase.LoadAssetAtPath<Object>(path)    != null) AssetDatabase.DeleteAsset(path);
+        if (AssetDatabase.LoadAssetAtPath<Object>(matPath) != null) AssetDatabase.DeleteAsset(matPath);
+
+        // Save material as an asset — inline materials don't survive prefab serialization
+        var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var mat = new Material(shader);
+        mat.SetColor("_BaseColor",    Color.white);
+        mat.SetColor("_EmissionColor", Color.white);
+        mat.EnableKeyword("_EMISSION");
+        AssetDatabase.CreateAsset(mat, matPath);
+
+        var go = new GameObject("LightningBolt");
+        var lr = go.AddComponent<LineRenderer>();
+        lr.positionCount     = 8;
+        lr.startWidth        = 0.3f;
+        lr.endWidth          = 0.06f;
+        lr.useWorldSpace     = true;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows    = false;
+        lr.enabled           = false;
+        lr.sharedMaterial    = mat;
+
+        go.AddComponent<LightningBolt>();
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    static GameObject CreateLightningEffectPrefab()
+    {
+        string path = "Assets/Prefabs/LightningEffect.prefab";
+        var go = new GameObject("LightningEffect");
+        var ps = go.AddComponent<ParticleSystem>();
+
+        var main = ps.main;
+        main.duration        = 0.5f;
+        main.loop            = false;
+        main.startLifetime   = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
+        main.startSpeed      = new ParticleSystem.MinMaxCurve(8f, 20f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(0.2f, 0.8f);
+        main.stopAction      = ParticleSystemStopAction.Destroy;
+        main.gravityModifier = new ParticleSystem.MinMaxCurve(0.1f);
+
+        // Electric white burst
+        var grad = new ParticleSystem.MinMaxGradient(
+            new Color(0.9f, 0.95f, 1.0f),
+            new Color(1.0f, 1.0f, 1.0f));
+        main.startColor = grad;
+
+        var emission = ps.emission;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 60) });
+
+        var shape = ps.shape;
+        shape.enabled   = true;
+        shape.shapeType = ParticleSystemShapeType.Hemisphere;
+        shape.radius    = 1.0f;
+        shape.radiusThickness = 1f;
+
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
+        if (shader != null) renderer.material = new Material(shader);
 
         var prefab = SavePrefab(go, path);
         Object.DestroyImmediate(go);
@@ -550,7 +661,10 @@ public static class GameSetup
     static void BuildGameScene(
         System.Collections.Generic.Dictionary<string, Material> mats,
         GameObject torpedoPrefab,
-        GameObject stonePrefab)
+        GameObject stonePrefab,
+        GameObject lightningMarkerPrefab,
+        GameObject lightningBoltPrefab,
+        GameObject lightningEffectPrefab)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -618,7 +732,7 @@ public static class GameSetup
 
         // Level 4: Volcano — central volcano island matching Level 3 scale
         var islands4RootGO = new GameObject("Level4_Volcano");
-        CreateVulcanoIsland(Vector3.zero, 33.6f, mats, stonePrefab, islands4RootGO.transform);
+        CreateVulcanoIsland(Vector3.zero, 33.6f, mats, stonePrefab, lightningMarkerPrefab, lightningBoltPrefab, lightningEffectPrefab, islands4RootGO.transform);
         float[] rockAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
         foreach (float angle in rockAngles)
         {
@@ -959,6 +1073,9 @@ public static class GameSetup
     static void CreateVulcanoIsland(Vector3 pos, float targetRadius,
         System.Collections.Generic.Dictionary<string, Material> mats,
         GameObject stonePrefab,
+        GameObject lightningMarkerPrefab,
+        GameObject lightningBoltPrefab,
+        GameObject lightningEffectPrefab,
         Transform parent = null)
     {
         var island = new GameObject("Island");
@@ -969,6 +1086,11 @@ public static class GameSetup
 
         var eruption = island.AddComponent<VolcanoEruption>();
         eruption.stonePrefab = stonePrefab;
+
+        var lightning = island.AddComponent<LightningStrike>();
+        lightning.markerPrefab = lightningMarkerPrefab;
+        lightning.boltPrefab   = lightningBoltPrefab;
+        lightning.effectPrefab = lightningEffectPrefab;
 
         // Invisible capsule collider so torpedoes register hits
         var cap = island.AddComponent<CapsuleCollider>();
@@ -1847,6 +1969,46 @@ public static class GameSetup
 
         yrBoughtGO.SetActive(false);
 
+        // White ship card (Bought tab only — unlocked via godship promo, no SELL button)
+        var whiteBoughtGO = new GameObject("WhiteShipBoughtCard");
+        whiteBoughtGO.transform.SetParent(boughtContentGO.transform, false);
+        whiteBoughtGO.AddComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f, 1f);
+        var whiteBoughtRT = whiteBoughtGO.GetComponent<RectTransform>();
+        whiteBoughtRT.anchorMin = new Vector2(0.02f, 0.06f);
+        whiteBoughtRT.anchorMax = new Vector2(0.38f, 0.34f);
+        whiteBoughtRT.offsetMin = whiteBoughtRT.offsetMax = Vector2.zero;
+
+        var whiteSwatchGO = new GameObject("ColorSwatch");
+        whiteSwatchGO.transform.SetParent(whiteBoughtGO.transform, false);
+        whiteSwatchGO.AddComponent<Image>().color = Color.white;
+        var whiteSwatchRT = whiteSwatchGO.GetComponent<RectTransform>();
+        whiteSwatchRT.anchorMin = new Vector2(0.05f, 0.45f);
+        whiteSwatchRT.anchorMax = new Vector2(0.95f, 0.92f);
+        whiteSwatchRT.offsetMin = whiteSwatchRT.offsetMax = Vector2.zero;
+
+        var whiteNameGO = MakeText("ShipNameText", whiteBoughtGO.transform, "WHITE SHIP", 20, Color.white);
+        var whiteNameRT = whiteNameGO.GetComponent<RectTransform>();
+        whiteNameRT.anchorMin = new Vector2(0f, 0.30f);
+        whiteNameRT.anchorMax = new Vector2(1f, 0.43f);
+        whiteNameRT.offsetMin = whiteNameRT.offsetMax = Vector2.zero;
+        whiteNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var whiteSelectBtnGO = MakeButton("SelectButton", whiteBoughtGO.transform, "SELECT");
+        var whiteSelectBtnRT = whiteSelectBtnGO.GetComponent<RectTransform>();
+        whiteSelectBtnRT.anchorMin        = new Vector2(0.05f, 0.04f);
+        whiteSelectBtnRT.anchorMax        = new Vector2(0.95f, 0.26f);
+        whiteSelectBtnRT.sizeDelta        = Vector2.zero;
+        whiteSelectBtnRT.anchoredPosition = Vector2.zero;
+
+        var whiteSelectedLabelGO = MakeText("SelectedLabel", whiteBoughtGO.transform, "✓ SELECTED", 20, Color.green);
+        var whiteSelectedLabelRT = whiteSelectedLabelGO.GetComponent<RectTransform>();
+        whiteSelectedLabelRT.anchorMin = new Vector2(0.05f, 0.04f);
+        whiteSelectedLabelRT.anchorMax = new Vector2(0.95f, 0.26f);
+        whiteSelectedLabelRT.offsetMin = whiteSelectedLabelRT.offsetMax = Vector2.zero;
+        whiteSelectedLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        whiteBoughtGO.SetActive(false);
+
         // Pirate ship card (Bought tab — initially inactive; RefreshShopUI activates on purchase)
         var piratBoughtGO = new GameObject("PiratShipBoughtCard");
         piratBoughtGO.transform.SetParent(boughtContentGO.transform, false);
@@ -2006,6 +2168,9 @@ public static class GameSetup
         script.yellowRedShipBoughtCard    = yrBoughtGO;
         script.yellowRedShipSelectButton  = yrSelectBtnGO.GetComponent<Button>();
         script.yellowRedShipSelectedLabel = yrSelectedLabelGO.GetComponent<Text>();
+        script.whiteShipBoughtCard        = whiteBoughtGO;
+        script.whiteShipSelectButton      = whiteSelectBtnGO.GetComponent<Button>();
+        script.whiteShipSelectedLabel     = whiteSelectedLabelGO.GetComponent<Text>();
         script.piratShipToBuyCard         = piratToBuyGO;
         script.piratShipBoughtCard        = piratBoughtGO;
         script.buyPiratShipButton         = piratBuyBtnGO.GetComponent<Button>();
@@ -2044,6 +2209,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             yrSelectBtnGO.GetComponent<Button>().onClick,
             script.OnSelectYellowRedShip);
+        UnityEventTools.AddPersistentListener(
+            whiteSelectBtnGO.GetComponent<Button>().onClick,
+            script.OnSelectWhiteShip);
         UnityEventTools.AddPersistentListener(
             piratBuyBtnGO.GetComponent<Button>().onClick,
             script.OnBuyPiratShipClicked);

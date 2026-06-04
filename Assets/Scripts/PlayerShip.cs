@@ -50,8 +50,10 @@ public class PlayerShip : MonoBehaviour
         bool yellow     = selected == "yellow";
         bool yellowRed  = selected == "yellowred";
         bool pirat      = selected == "pirat";
+        bool white      = selected == "white";
 
         ShipStats stats = pirat     ? ShipData.Pirate
+                        : white     ? ShipData.White
                         : yellowRed ? ShipData.YellowRed
                         : yellow    ? ShipData.Yellow
                                     : ShipData.Blue;
@@ -68,10 +70,12 @@ public class PlayerShip : MonoBehaviour
         }
         else
         {
-            Color hullColor  = yellow    ? new Color(1.0f, 0.85f, 0.0f)
+            Color hullColor  = white     ? Color.white
+                             : yellow    ? new Color(1.0f, 0.85f, 0.0f)
                              : yellowRed ? new Color(1.0f, 0.85f, 0.0f)
                                          : new Color(0.30f, 0.40f, 0.70f);
-            Color cabinColor = yellowRed ? new Color(0.85f, 0.10f, 0.10f)
+            Color cabinColor = white     ? Color.white
+                             : yellowRed ? new Color(0.85f, 0.10f, 0.10f)
                              : yellow    ? new Color(1.0f, 0.85f, 0.0f)
                                          : new Color(0.30f, 0.40f, 0.70f);
             var hull  = transform.Find("Hull")?.GetComponent<MeshRenderer>();
