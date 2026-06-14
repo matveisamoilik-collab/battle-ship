@@ -37,10 +37,11 @@ public class BotShip : MonoBehaviour
     void Start()
     {
         int level    = GameManager.Instance != null ? GameManager.Instance.PlayingLevel : 1;
-        bool isBlack = level == 1 || level == 4;
+        bool isBlack = level == 4;
         bool isPirat = level == 3;
+        bool isRed   = level == 1 || level == 2;
 
-        ShipStats stats = isBlack ? ShipData.Black : (isPirat ? ShipData.Pirate : ShipData.Blue);
+        ShipStats stats = isBlack ? ShipData.Black : (isPirat ? ShipData.Pirate : (isRed ? ShipData.Red : ShipData.Blue));
         moveSpeed        = stats.speed;
         maxHP            = stats.hp;
         torpedoDamage    = stats.torpedoDamage;
@@ -58,23 +59,27 @@ public class BotShip : MonoBehaviour
         nextFireTime = Time.time + currentFireDelay;
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
 
-        ApplyBotShipVisual(isBlack, isPirat);
+        ApplyBotShipVisual(isBlack, isPirat, isRed);
     }
 
-    void ApplyBotShipVisual(bool isBlack, bool isPirat)
+    void ApplyBotShipVisual(bool isBlack, bool isPirat, bool isRed)
     {
         if (isBlack)
             ApplyBlackShipVisual();
         else if (isPirat)
             ApplyPiratShipVisual();
+        else if (isRed)
+            ApplyColorShipVisual(new Color(0.70f, 0.10f, 0.10f));
         else
-        {
-            Color blueColor = new Color(0.30f, 0.40f, 0.70f);
-            var hull  = transform.Find("Hull");
-            var cabin = transform.Find("Cabin");
-            if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr != null) mr.material.SetColor("_BaseColor", blueColor); }
-            if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr != null) mr.material.SetColor("_BaseColor", blueColor); }
-        }
+            ApplyColorShipVisual(new Color(0.30f, 0.40f, 0.70f));
+    }
+
+    void ApplyColorShipVisual(Color color)
+    {
+        var hull  = transform.Find("Hull");
+        var cabin = transform.Find("Cabin");
+        if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr != null) mr.material.SetColor("_BaseColor", color); }
+        if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr != null) mr.material.SetColor("_BaseColor", color); }
     }
 
     void ApplyBlackShipVisual()

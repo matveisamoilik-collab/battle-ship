@@ -143,11 +143,12 @@ GameManager (non-persistent singleton, IsGameOver)
 **GameManager** is a non-persistent singleton (not `DontDestroyOnLoad`). It sets `Time.timeScale = 0f` on game-over and restores it to `1f` on scene reload. `ShakeCamera(duration, magnitude)` is the public entry point for all camera shake — do not call `CameraFollow.Shake()` directly.
 
 **BotShip visual**: Bot ship type is determined by level at runtime in `BotShip.Start()`:
-- **Level 1** — **Black ship**: box geometry scaled down by 1/1.5 (root `localScale = (0.667, 0.667, 0.667)`), hull/cabin painted near-black. Hull world length ≈ 8 units; collision half-radius = 4f; `minPlayerDist = 14f`.
-- **Level 2** — **Blue ship**: hull/cabin painted blue via `material.SetColor`. Hull 12 units; collision half-radius = 6f; `minPlayerDist = 18f`.
+- **Level 1** — **Red ship**: hull/cabin painted red `(0.70, 0.10, 0.10)` via `ApplyColorShipVisual()`. Hull 12 units; collision half-radius = 6f; `minPlayerDist = 18f`.
+- **Level 2** — **Red ship**: same as Level 1 red bot.
+- **Level 4 (survival)** — **Black ship**: box geometry scaled down by 1/1.5 (root `localScale = (0.667, 0.667, 0.667)`), hull/cabin painted near-black. Hull world length ≈ 8 units; collision half-radius = 4f; `minPlayerDist = 14f`.
 - **Level 3** — **Pirate ship** (`pirat_ship.fbx`): box MeshRenderers are disabled, FBX instantiated as a child and auto-scaled so its longest XZ axis = 12 units. Both player and bot share the same `pirat_ship.fbx` asset (`Assets/Models/PiratShip/`). The Hull BoxCollider stays active for torpedo hits.
 
-`ApplyBotShipVisual(isBlack, isPirat)` in `BotShip` dispatches to `ApplyBlackShipVisual()`, `ApplyPiratShipVisual()`, or blue-color assignment. The same `ApplyPiratShipVisual()` logic exists in `PlayerShip` for when the player selects the pirate ship. The FBX is exported from Blender (Z-up, `bakeAxisConversion: 0`) so rotation `(-90°X, 270°Y, 0°Z)` is applied before AABB measurement.
+`ApplyBotShipVisual(isBlack, isPirat, isRed)` in `BotShip` dispatches to `ApplyBlackShipVisual()`, `ApplyPiratShipVisual()`, or `ApplyColorShipVisual(color)` (red for L1/L2, blue fallback). The same `ApplyPiratShipVisual()` logic exists in `PlayerShip` for when the player selects the pirate ship. The FBX is exported from Blender (Z-up, `bakeAxisConversion: 0`) so rotation `(-90°X, 270°Y, 0°Z)` is applied before AABB measurement.
 
 **Black ship** is bot-only (not available in the shop). It appears only on Level 1.
 
@@ -182,10 +183,11 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Player move speed — yellow ship | 40 units/s (2× blue) |
 | Player move speed — yellow-red ship | 24 units/s (1.2× blue) |
 | Player move speed — pirate ship | 20 units/s (same as blue) |
-| Bot move speed — L1 (black) | 15 units/s |
-| Bot move speed — L2 (blue) | 20 units/s |
+| Bot move speed — L1/L2 (red) | 20 units/s |
 | Bot move speed — L3 (pirate) | 20 units/s |
-| Bot fire delay — L1 (black) | 2.5 s base (±20%) |
+| Bot move speed — L4 (black) | 15 units/s |
+| Bot fire delay — L1/L2 (red) | 1.7 s base (±20%) |
+| Bot fire delay — L4 (black) | 2.5 s base (±20%) |
 | Yellow ship cost | 150 coins |
 | Yellow ship sell price | 75 coins (half price) |
 | Pirate ship cost | 200 coins |
@@ -210,8 +212,8 @@ Both ships move via direct `transform.position +=` — Unity physics does not ru
 
 Two levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key (highest unlocked level — never decreases).
 
-- **Level 1** — open water, black bot ship: all 6 islands are parented under `IslandsRoot`. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. Island collision is a no-op.
-- **Level 2** — island map, blue bot ship: `IslandsRoot` active; islands behave as before.
+- **Level 1** — open water, red bot ship: all 6 islands are parented under `IslandsRoot`. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. Island collision is a no-op.
+- **Level 2** — island map, red bot ship: `IslandsRoot` active; islands behave as before.
 - **Level 3** — Skull Shoals, pirate bot ship: `Islands3Root` active; one skull island + 6 rocks.
 - **Level 4** — Volcano, survival mode: `Islands4Root` active; central Vulcano.fbx island. **Win condition: survive 120 s without dying.** One black ship spawns at game start (the scene's BotShip); an additional black ship spawns every 11 s (up to 5 total). Bots that are destroyed are simply removed — no game over. A countdown timer (`TimerText`, 48pt white bold, top-centre HUD) is shown; the bot HP bar is hidden. When the timer hits 0, all remaining bots are destroyed and `TriggerVictory()` is called. **Volcano eruption**: the volcano island has a `VolcanoEruption` component that launches a `VolcanoStone` projectile every 5 s, aimed at the player's current XZ position. Stones arc up from the volcano top `(0.5, 13.5, 1.4)` with `VertSpeed=22`, `Gravity=14`; time-of-flight is solved analytically so the stone lands on target. On impact the stone spawns a `SplashEffect` (blue-white burst particles), shakes the camera, and deals **3 damage** to the player if within 8 units. Prefabs: `Assets/Prefabs/VolcanoStone.prefab`, `Assets/Prefabs/SplashEffect.prefab` (created by Build All). Scripts: `VolcanoStone.cs`, `VolcanoEruption.cs`. **Atmosphere**: Level 4 swaps the skybox to `SkyboxMaterial_L4.mat` (gray overcast, no sun disk) and dims the directional light to intensity 0.5 with a cool gray color — applied in `GameManager.Start()`. **Clouds**: 43 cloud objects parented under `Level4_Clouds` (activated only for Level 4 in `GameManager.Awake()`). Clouds are built by `GameSetup.CreateCloud()` from 4 overlapping sphere primitives (no colliders). Each cloud has a `CloudDrifter` component that orbits the volcano center at a fixed linear speed of 10.5 units/s (angular speed = linearSpeed / radius × Rad2Deg, so all clouds move at the same perceived pace). Cloud color is lerped per-cloud from dark gray `(0.50, 0.50, 0.53)` at radius 0 to light gray `(0.90, 0.90, 0.92)` at radius 150, using inline `new Material()` (not saved as asset files). One special central cloud sits stationary at `(0, 22, 0)` directly above the volcano mouth, is 1.3× normal size, and slowly self-rotates at 6°/s around its Y axis (`CloudDrifter.selfRotateSpeed`). 14 inner clouds orbit at 15–50 units radius; 28 outer clouds orbit at 50–150 units radius; all go the same direction. **Lightning strike**: the volcano island also has a `LightningStrike` component. Every 15 s it snapshots the player's XZ position and spawns a `LightningMarker` prefab there — a flat transparent red disc (radius 12 units, `Assets/Prefabs/LightningMarker.prefab`) just above the water surface. After 3 s, the marker is destroyed and 3 `LightningBolt` instances are spawned from the central cloud base `(0, 17, 0)` down to the strike centre (bolts 2 and 3 have ±2-unit XZ jitter). Each bolt is a `LineRenderer` with 8 segments zigzagging between endpoints; it flashes 6 times (0.10 s on / 0.23 s off ≈ 2 s total) using `WaitForSecondsRealtime` then self-destructs. A ground-level white particle burst (`LightningEffect.prefab`) also fires at the strike point. Camera shakes `(0.4 s, 0.35)`. If the player is within 12 units of the strike centre at the moment of impact, they take 1 damage. The lightning bolt material is saved as `Assets/Materials/LightningBoltMaterial.mat` (URP/Lit, white + emission) — **must be a saved asset** or it will appear pink. Scripts: `LightningStrike.cs`, `LightningBolt.cs`. Prefabs: `LightningMarker.prefab`, `LightningBolt.prefab`, `LightningEffect.prefab`.
 - **Progression**: `TriggerVictory()` (and `BotDefeated()` for levels 1-3) advances `"CurrentLevel"` by 1, capped at 4. Loss never changes the level.
