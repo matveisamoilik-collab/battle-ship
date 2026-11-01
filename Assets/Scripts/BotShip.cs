@@ -19,6 +19,10 @@ public class BotShip : MonoBehaviour
     [Header("Level 3 Visual")]
     public GameObject piratShipModel;
 
+    [Header("Variant")]
+    [HideInInspector] public bool spawnAsPurple; // set by GameManager right after Instantiate (Level 5 split)
+    public bool IsPurple => spawnAsPurple;
+
     private const float FiringArc = 10f; // fire only when player is within this bow cone
 
     private float minPlayerDist;   // set in Start() based on ship size
@@ -33,25 +37,32 @@ public class BotShip : MonoBehaviour
     private float postFireDist;
     private Quaternion postFireTarget;
     private IslandData[] islands;
+    private bool defeated;
 
     void Start()
     {
         int level    = GameManager.Instance != null ? GameManager.Instance.PlayingLevel : 1;
-        bool isBlack = level == 4;
-        bool isPirat = level == 3;
-        bool isRed   = level == 1 || level == 2;
+        bool isPurple = spawnAsPurple;
+        bool isBlack  = !isPurple && level == 4;
+        bool isPirat  = !isPurple && level == 3;
+        bool isRed    = !isPurple && (level == 1 || level == 2 || level == 5);
 
-        ShipStats stats = isBlack ? ShipData.Black : (isPirat ? ShipData.Pirate : (isRed ? ShipData.Red : ShipData.Blue));
+        ShipStats stats = isPurple ? ShipData.Purple
+                        : isBlack  ? ShipData.Black
+                        : isPirat  ? ShipData.Pirate
+                        : isRed    ? ShipData.Red
+                                   : ShipData.Blue;
         moveSpeed        = stats.speed;
         maxHP            = stats.hp;
         torpedoDamage    = stats.torpedoDamage;
         currentFireDelay = stats.fireDelay;
         currentHP        = maxHP;
+        if (isPurple) healthBar = null; // purple ships don't drive the HUD bot HP bar
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
 
-        // Collision radii depend on hull size (black ship is 1.5× smaller)
-        shipHullRadius = isBlack ? 4f : 6f;          // half hull length
-        minPlayerDist  = isBlack ? 14f : 18f;        // self + player half-lengths + buffer
+        // Collision radii depend on hull size (black 2/3 size, purple 1/2 size)
+        shipHullRadius = isPurple ? 3f  : (isBlack ? 4f  : 6f);   // half hull length
+        minPlayerDist  = isPurple ? 13f : (isBlack ? 14f : 18f);  // self + player half-lengths + buffer
 
         GameObject playerGO = GameObject.FindWithTag("Player");
         if (playerGO != null) player = playerGO.transform;
@@ -59,12 +70,14 @@ public class BotShip : MonoBehaviour
         nextFireTime = Time.time + currentFireDelay;
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
 
-        ApplyBotShipVisual(isBlack, isPirat, isRed);
+        ApplyBotShipVisual(isBlack, isPirat, isRed, isPurple);
     }
 
-    void ApplyBotShipVisual(bool isBlack, bool isPirat, bool isRed)
+    void ApplyBotShipVisual(bool isBlack, bool isPirat, bool isRed, bool isPurple)
     {
-        if (isBlack)
+        if (isPurple)
+            ApplyPurpleShipVisual();
+        else if (isBlack)
             ApplyBlackShipVisual();
         else if (isPirat)
             ApplyPiratShipVisual();
@@ -93,6 +106,14 @@ public class BotShip : MonoBehaviour
         var cabin = transform.Find("Cabin");
         if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr != null) mr.material.SetColor("_BaseColor", blackColor); }
         if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr != null) mr.material.SetColor("_BaseColor", blackColor); }
+    }
+
+    void ApplyPurpleShipVisual()
+    {
+        // Half-size ship (size = 0.5 in ShipData) painted purple
+        float s = ShipData.Purple.size;
+        transform.localScale = new Vector3(s, s, s);
+        ApplyColorShipVisual(new Color(0.50f, 0.15f, 0.70f));
     }
 
     void ApplyPiratShipVisual()
@@ -297,7 +318,10 @@ public class BotShip : MonoBehaviour
         currentHP -= amount;
         currentHP = Mathf.Max(0f, currentHP);
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
-        if (currentHP <= 0f && GameManager.Instance != null)
+        if (currentHP <= 0f && !defeated && GameManager.Instance != null)
+        {
+            defeated = true;
             GameManager.Instance.BotDefeated(this);
+        }
     }
 }

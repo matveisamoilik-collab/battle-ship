@@ -29,6 +29,32 @@ public class PlayerShip : MonoBehaviour
     private float nextEnemyRefresh;
     private float lastShakeTime = -999f;
 
+    // Island collision damage (Level 5+)
+    private const int   IslandCrashDamageFromLevel = 5;
+    private const float IslandCrashDamage          = 1f;
+    private const float IslandTouchMargin          = 0.5f; // hysteresis so resting against the coast isn't re-counted
+    private bool        wasTouchingIsland;
+
+    // Level 5 anchor pull — while active, player input is ignored and the ship is dragged to pullTarget
+    private bool    isPulled;
+    private Vector3 pullTarget;
+    private float   pullSpeed;
+    public  bool    PullCrashed { get; private set; }
+
+    public void BeginPull(Vector3 target, float speed)
+    {
+        isPulled    = true;
+        pullTarget  = target;
+        pullSpeed   = speed;
+        PullCrashed = false;
+    }
+
+    public void EndPull()
+    {
+        isPulled    = false;
+        PullCrashed = false;
+    }
+
     void Start()
     {
         currentHP = maxHP;
@@ -153,8 +179,18 @@ public class PlayerShip : MonoBehaviour
             turn    = Mathf.Clamp(turn    + virtualJoystick.Direction.x, -1f, 1f);
         }
 
-        transform.Rotate(Vector3.up, turn * rotationSpeed * Time.deltaTime);
-        transform.position += transform.forward * forward * moveSpeed * Time.deltaTime;
+        if (isPulled)
+        {
+            Vector3 toTarget = pullTarget - transform.position;
+            toTarget.y = 0f;
+            if (toTarget.sqrMagnitude > 0.0001f)
+                transform.position += toTarget.normalized * pullSpeed * Time.deltaTime;
+        }
+        else
+        {
+            transform.Rotate(Vector3.up, turn * rotationSpeed * Time.deltaTime);
+            transform.position += transform.forward * forward * moveSpeed * Time.deltaTime;
+        }
 
         // Keep ship inside arena bounds and flat on water
         Vector3 pos = transform.position;
@@ -196,6 +232,7 @@ public class PlayerShip : MonoBehaviour
     Vector3 PushOutOfIslands(Vector3 pos)
     {
         const float shipRadius = 6f; // hull half-length — prevents front/back penetration
+        bool touching = false;
         foreach (var island in islands)
         {
             if (island == null) continue;
@@ -203,14 +240,25 @@ public class PlayerShip : MonoBehaviour
             float dz = pos.z - island.transform.position.z;
             float distSq = dx * dx + dz * dz;
             float minDist = island.radius + shipRadius;
+            float touchDist = minDist + IslandTouchMargin;
+            if (distSq < touchDist * touchDist) touching = true;
             if (distSq < minDist * minDist && distSq > 0.0001f)
             {
                 float dist = Mathf.Sqrt(distSq);
                 pos.x += dx / dist * (minDist - dist);
                 pos.z += dz / dist * (minDist - dist);
                 TryShake();
+                if (isPulled) PullCrashed = true;
             }
         }
+
+        // From Level 5 on, every new island collision (manual or anchor pull) costs HP.
+        // Damage fires only on the frame contact begins, not every frame while scraping along the coast.
+        if (touching && !wasTouchingIsland && GameManager.Instance != null
+            && GameManager.Instance.PlayingLevel >= IslandCrashDamageFromLevel)
+            TakeDamage(IslandCrashDamage);
+        wasTouchingIsland = touching;
+
         return pos;
     }
 

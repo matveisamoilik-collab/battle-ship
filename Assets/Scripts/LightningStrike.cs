@@ -74,7 +74,10 @@ public class LightningStrike : MonoBehaviour
                     ? Vector3.zero
                     : new Vector3(Random.Range(-2f, 2f), 0f, Random.Range(-2f, 2f));
                 var boltGO = Instantiate(boltPrefab, Vector3.zero, Quaternion.identity);
-                boltGO.GetComponent<LightningBolt>().Init(CloudBase, _strikePos + jitter);
+                var bolt   = boltGO.GetComponent<LightningBolt>();
+                // Main bolt deals damage on every flash while the player is inside the circle
+                if (i == 0) bolt.SetDamage(_strikePos, DamageRadius, StrikeDamage);
+                bolt.Init(CloudBase, _strikePos + jitter);
             }
         }
 
@@ -83,19 +86,6 @@ public class LightningStrike : MonoBehaviour
             Instantiate(effectPrefab, _strikePos, Quaternion.identity);
 
         GameManager.Instance?.ShakeCamera(0.4f, 0.35f);
-
-        var playerGO = GameObject.FindWithTag("Player");
-        if (playerGO != null)
-        {
-            float dist = Vector3.Distance(
-                new Vector3(playerGO.transform.position.x, 0f, playerGO.transform.position.z),
-                _strikePos);
-            if (dist <= DamageRadius)
-            {
-                var ship = playerGO.GetComponent<PlayerShip>()
-                           ?? playerGO.GetComponentInParent<PlayerShip>();
-                ship?.TakeDamage(StrikeDamage);
-            }
-        }
+        // Damage is applied per flash by the main LightningBolt (see LightningBolt.SetDamage)
     }
 }

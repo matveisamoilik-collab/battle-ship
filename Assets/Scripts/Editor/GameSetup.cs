@@ -83,6 +83,7 @@ public static class GameSetup
         EnsureFolder("Assets/Models", "IslandWithSkull");
         EnsureFolder("Assets/Models", "PiratShip");
         EnsureFolder("Assets/Models", "Vulcano");
+        EnsureFolder("Assets/Models", "AnchorBay");
     }
 
     static void EnsureFolder(string parent, string child)
@@ -109,6 +110,7 @@ public static class GameSetup
         dict["TreeLeaves"] = MakeMat("TreeLeavesMaterial", new Color(0.15f, 0.45f, 0.15f));
         dict["Volcanic"]   = MakeMat("VolcanicMaterial",   new Color(0.18f, 0.12f, 0.10f));
         dict["Stone"]      = MakeMat("StoneMaterial",      new Color(0.38f, 0.38f, 0.40f));
+        dict["AnchorChain"] = MakeMat("AnchorChainMaterial", new Color(0.22f, 0.22f, 0.24f), smoothness: 0.4f, metallic: 0.6f);
         dict["Cloud"]      = MakeMat("CloudMaterial",      new Color(0.90f, 0.90f, 0.92f));
         dict["CloudDark"]  = MakeMat("CloudDarkMaterial",  new Color(0.50f, 0.50f, 0.53f));
         return dict;
@@ -415,7 +417,7 @@ public static class GameSetup
         string srcDir = System.IO.Path.Combine(projectRoot, "images");
         string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5" })
         {
             string src = System.IO.Path.Combine(srcDir, lvl + ".png");
             string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
@@ -427,7 +429,7 @@ public static class GameSetup
 
         AssetDatabase.Refresh();
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5" })
         {
             string assetPath = "Assets/Resources/" + lvl + ".png";
             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -449,6 +451,12 @@ public static class GameSetup
         string src        = System.IO.Path.Combine(projectRoot, "3d", "island", "islandWithSkull.fbx");
         string assetPath  = "Assets/Models/IslandWithSkull/islandWithSkull.fbx";
         string dst        = System.IO.Path.Combine(Application.dataPath, "Models", "IslandWithSkull", "islandWithSkull.fbx");
+
+        // Level 5 Anchor Bay models (islands + anchor)
+        string anchorDir = System.IO.Path.Combine(projectRoot, "3d", "anchor");
+        ImportModel(System.IO.Path.Combine(anchorDir, "AnchorIsland1_0.5mb.fbx"), AnchorIsland1Path);
+        ImportModel(System.IO.Path.Combine(anchorDir, "AnchorIsland2_0.5mb.fbx"), AnchorIsland2Path);
+        ImportModel(System.IO.Path.Combine(anchorDir, "AnchorModel_0.1mb.fbx"),   AnchorModelPath);
 
         if (!System.IO.File.Exists(src))
         {
@@ -742,6 +750,10 @@ public static class GameSetup
             CreateRock(rockPos, rockRng, mats, islands3RootGO.transform);
         }
 
+        // Level 5: Anchor Bay — big anchor island (right) + small island (left) with a giant anchor
+        var islands5RootGO = new GameObject("Level5_AnchorBay");
+        BuildAnchorBay(mats, islands5RootGO.transform);
+
         // Level 4 clouds — 16 clouds orbiting the volcano at the same linear speed
         const float CloudLinearSpeed = 10.5f; // units per second
         var cloudsRootGO = new GameObject("Level4_Clouds");
@@ -891,6 +903,7 @@ public static class GameSetup
         gm.islandsRoot  = islandsRootGO;
         gm.islands3Root = islands3RootGO;
         gm.islands4Root  = islands4RootGO;
+        gm.islands5Root  = islands5RootGO;
         gm.botHPGroup    = botHealthBar.transform.parent.gameObject; // "BotHP" group
         gm.botShipPrefab = botShipPrefabGO;
         gm.cloudySkybox      = l4SkyboxMat;
@@ -1142,6 +1155,188 @@ public static class GameSetup
 
         foreach (var col in modelGO.GetComponentsInChildren<Collider>())
             Object.DestroyImmediate(col);
+    }
+
+    // -------------------------------------------------------------------------
+    // Level 5 — Anchor Bay
+    // -------------------------------------------------------------------------
+
+    const string AnchorIsland1Path = "Assets/Models/AnchorBay/AnchorIsland1.fbx";
+    const string AnchorIsland2Path = "Assets/Models/AnchorBay/AnchorIsland2.fbx";
+    const string AnchorModelPath   = "Assets/Models/AnchorBay/AnchorModel.fbx";
+
+    // Copies an FBX from outside Assets and imports it with external URP-compatible materials
+    static void ImportModel(string srcPath, string assetPath)
+    {
+        if (!System.IO.File.Exists(srcPath))
+        {
+            Debug.LogWarning("[ShipButtlr] Model not found at: " + srcPath);
+            return;
+        }
+        string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+        System.IO.File.Copy(srcPath, System.IO.Path.Combine(projectRoot, assetPath), overwrite: true);
+        AssetDatabase.Refresh();
+        var importer = AssetImporter.GetAtPath(assetPath) as ModelImporter;
+        if (importer != null)
+        {
+            importer.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
+            importer.materialLocation   = ModelImporterMaterialLocation.External;
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+        }
+        Debug.Log("[ShipButtlr] Imported " + assetPath);
+    }
+
+    // Instantiates a model under parent, uniformly scaled so its largest XZ extent (or XYZ when
+    // includeY) equals targetSize, centred on the parent in XZ with its bottom at parent y = 0.
+    static GameObject FitModel(GameObject prefab, Transform parent, float targetSize,
+                               Vector3 euler, bool includeY, string name)
+    {
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        go.name = name;
+        go.transform.position   = Vector3.zero;
+        go.transform.rotation   = Quaternion.Euler(euler);
+        go.transform.localScale = Vector3.one;
+
+        Bounds wb = new Bounds();
+        bool hasMesh = false;
+        foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf.sharedMesh == null) continue;
+            var b = mf.sharedMesh.bounds;
+            for (int sx = -1; sx <= 1; sx += 2)
+            for (int sy = -1; sy <= 1; sy += 2)
+            for (int sz = -1; sz <= 1; sz += 2)
+            {
+                var wc = mf.transform.TransformPoint(
+                    b.center + Vector3.Scale(b.extents, new Vector3(sx, sy, sz)));
+                if (!hasMesh) { wb = new Bounds(wc, Vector3.zero); hasMesh = true; }
+                else wb.Encapsulate(wc);
+            }
+        }
+
+        float extent = Mathf.Max(wb.size.x, wb.size.z);
+        if (includeY) extent = Mathf.Max(extent, wb.size.y);
+        float s = (hasMesh && extent > 0.0001f) ? targetSize / extent : 1f;
+
+        Debug.Log($"[ShipButtlr] {name}: bounds={wb.size} extent={extent:F3} scale={s:F3}");
+
+        go.transform.SetParent(parent, false);
+        go.transform.localEulerAngles = euler;
+        go.transform.localScale       = new Vector3(s, s, s);
+        go.transform.localPosition    = new Vector3(-wb.center.x * s, -wb.min.y * s, -wb.center.z * s);
+
+        foreach (var col in go.GetComponentsInChildren<Collider>())
+            Object.DestroyImmediate(col);
+        return go;
+    }
+
+    // Island root (tag, IslandData, torpedo capsule) + FBX model fitted to targetRadius * 1.6
+    static GameObject CreateAnchorIsland(Vector3 pos, float targetRadius, string assetPath,
+                                         Transform parent, string name, out GameObject model)
+    {
+        model = null;
+        var island = new GameObject(name);
+        island.transform.SetParent(parent);
+        island.transform.position = pos;
+        island.tag = "Island";
+        island.AddComponent<IslandData>().radius = targetRadius * 0.8f;
+
+        var cap = island.AddComponent<CapsuleCollider>();
+        cap.radius = targetRadius * 0.8f;
+        cap.height = 30f;
+        cap.center = new Vector3(0f, 15f, 0f);
+
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+        if (prefab == null)
+        {
+            Debug.LogWarning("[ShipButtlr] " + assetPath + " not found — run Build All again after Unity imports it.");
+            return island;
+        }
+        model = FitModel(prefab, island.transform, targetRadius * 1.6f,
+                         new Vector3(-90f, 0f, 0f), false, name + "Model"); // Blender Z-up → Unity Y-up
+        return island;
+    }
+
+    // Highest point of the model's mesh surface under worldPos (XZ), found by an editor-time raycast
+    // against temporary MeshColliders. Returns fallback when nothing is hit.
+    static float SurfaceHeight(GameObject model, Vector3 worldPos, float fallback)
+    {
+        if (model == null) return fallback;
+        var temp = new System.Collections.Generic.List<MeshCollider>();
+        foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf.sharedMesh == null) continue;
+            var mc = mf.gameObject.AddComponent<MeshCollider>();
+            mc.sharedMesh = mf.sharedMesh;
+            temp.Add(mc);
+        }
+        Physics.SyncTransforms();
+
+        float y = fallback;
+        bool found = false;
+        var origin = new Vector3(worldPos.x, 500f, worldPos.z);
+        foreach (var hit in Physics.RaycastAll(origin, Vector3.down, 1000f))
+        {
+            var mc = hit.collider as MeshCollider;
+            if (mc == null || !temp.Contains(mc)) continue; // ignore L3/L4 capsules etc.
+            if (!found || hit.point.y > y) { y = hit.point.y; found = true; }
+        }
+        foreach (var mc in temp) Object.DestroyImmediate(mc);
+
+        if (!found) Debug.LogWarning("[ShipButtlr] Anchor surface raycast missed — using fallback height.");
+        return y;
+    }
+
+    static void BuildAnchorBay(System.Collections.Generic.Dictionary<string, Material> mats, Transform root)
+    {
+        const float ShipLength   = 12f;
+        const float BigRadius    = 33.6f;            // same targetRadius as L3/L4 islands
+        const float SmallRadius  = BigRadius / 3f;   // island 2 is 3× smaller
+        const float Gap          = ShipLength * 2f;  // edge-to-edge distance between islands
+
+        float bigR   = BigRadius   * 0.8f;           // visual / collision radius
+        float smallR = SmallRadius * 0.8f;
+        float half   = (2f * bigR + Gap + 2f * smallR) * 0.5f;
+
+        // Right (+X, as seen from player spawn) = big island, left (−X) = small island
+        var bigPos   = new Vector3( half - bigR,   0f, 0f);
+        var smallPos = new Vector3(-half + smallR, 0f, 0f);
+
+        var big = CreateAnchorIsland(bigPos, BigRadius, AnchorIsland1Path, root, "AnchorIsland1", out var bigModel);
+        CreateAnchorIsland(smallPos, SmallRadius, AnchorIsland2Path, root, "AnchorIsland2", out _);
+
+        // Anchor rests on island 1, on the side facing the player spawn (−Z)
+        var anchorPivot = new GameObject("Anchor");
+        anchorPivot.transform.SetParent(big.transform, false);
+        Vector3 restXZ = bigPos + new Vector3(0f, 0f, -bigR * 0.35f);
+        float restY = SurfaceHeight(bigModel, restXZ, 2f);
+        anchorPivot.transform.position = new Vector3(restXZ.x, restY, restXZ.z);
+
+        var anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AnchorModelPath);
+        if (anchorPrefab != null)
+            FitModel(anchorPrefab, anchorPivot.transform, BigRadius * 1.6f / 5f, // 5× smaller than island 1
+                     new Vector3(-90f, 0f, 0f), true, "AnchorModel");
+        else
+            Debug.LogWarning("[ShipButtlr] " + AnchorModelPath + " not found — run Build All again after Unity imports it.");
+
+        // Chain drawn from the rest point to the flying anchor (hidden while idle)
+        var chainGO = new GameObject("AnchorChain");
+        chainGO.transform.SetParent(big.transform, false);
+        var lr = chainGO.AddComponent<LineRenderer>();
+        lr.useWorldSpace        = true;
+        lr.positionCount        = 2;
+        lr.startWidth           = 0.35f;
+        lr.endWidth             = 0.35f;
+        lr.numCapVertices       = 2;
+        lr.generateLightingData = true;
+        lr.sharedMaterial       = mats["AnchorChain"];
+        lr.shadowCastingMode    = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.enabled              = false;
+
+        var hook = big.AddComponent<AnchorHook>();
+        hook.anchor = anchorPivot.transform;
+        hook.chain  = lr;
+        hook.island = big.GetComponent<IslandData>();
     }
 
     static void CreateIsland(Vector3 pos, float radius, int treeCount,
@@ -1575,6 +1770,18 @@ public static class GameSetup
         isle4RT.offsetMin = Vector2.zero;
         isle4RT.offsetMax = Vector2.zero;
 
+        // Island 5 — Anchor Bay (locked until CurrentLevel >= 5)
+        // Island body on Level_5.png ≈ x 1010–1330, y 450–640 px of 1536×1024
+        var isle5GO = new GameObject("Island5Button");
+        isle5GO.transform.SetParent(panel.transform, false);
+        isle5GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+        var isle5Btn = isle5GO.AddComponent<Button>();
+        var isle5RT  = isle5GO.GetComponent<RectTransform>();
+        isle5RT.anchorMin = new Vector2(0.66f, 0.38f);
+        isle5RT.anchorMax = new Vector2(0.86f, 0.56f);
+        isle5RT.offsetMin = Vector2.zero;
+        isle5RT.offsetMax = Vector2.zero;
+
         // Close button — top-right corner
         var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
         var closeRT    = closeBtnGO.GetComponent<RectTransform>();
@@ -1589,12 +1796,14 @@ public static class GameSetup
         script.island2Button = isle2Btn;
         script.island3Button = isle3Btn;
         script.island4Button = isle4Btn;
+        script.island5Button = isle5Btn;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
         UnityEventTools.AddPersistentListener(isle2Btn.onClick, script.OnIsland2Clicked);
         UnityEventTools.AddPersistentListener(isle3Btn.onClick, script.OnIsland3Clicked);
         UnityEventTools.AddPersistentListener(isle4Btn.onClick, script.OnIsland4Clicked);
+        UnityEventTools.AddPersistentListener(isle5Btn.onClick, script.OnIsland5Clicked);
         UnityEventTools.AddPersistentListener(
             closeBtnGO.GetComponent<Button>().onClick,
             script.OnCloseMapClicked);

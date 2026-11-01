@@ -22,6 +22,7 @@ public class GameManager : MonoBehaviour
     public GameObject islandsRoot;
     public GameObject islands3Root;
     public GameObject islands4Root;
+    public GameObject islands5Root;
     public Text levelText;
 
     [Header("Level 4")]
@@ -32,6 +33,7 @@ public class GameManager : MonoBehaviour
     public GameObject cloudsRoot;
     public Light      directionalLight;
 
+    public  const int   MaxLevel         = 5;
     private const float SurvivalDuration = 90f;
     private const float SpawnInterval    = 18f;
 
@@ -42,6 +44,11 @@ public class GameManager : MonoBehaviour
     private bool  wonLastGame;
     private float survivalTimer;
     private float spawnTimer;
+    private int   purpleAlive;     // Level 5: purple ships still afloat after the red ship sinks
+    private bool  purpleSpawned;   // Level 5: red ship already split into purples
+
+    private const int   PurpleSplitCount  = 2;
+    private const float PurpleSplitOffset = 4f; // sideways offset from the red ship's wreck
 
     void Awake()
     {
@@ -60,6 +67,7 @@ public class GameManager : MonoBehaviour
         if (islandsRoot  != null) islandsRoot.SetActive(playingLevel == 2);
         if (islands3Root != null) islands3Root.SetActive(playingLevel == 3);
         if (islands4Root != null) islands4Root.SetActive(playingLevel == 4);
+        if (islands5Root != null) islands5Root.SetActive(playingLevel == 5);
         if (cloudsRoot   != null) cloudsRoot.SetActive(playingLevel == 4);
     }
 
@@ -162,7 +170,7 @@ public class GameManager : MonoBehaviour
         UpdateCoinsText();
 
         int stored = PlayerPrefs.GetInt("CurrentLevel", 1);
-        if (stored < playingLevel + 1 && stored < 4)
+        if (stored < playingLevel + 1 && stored < MaxLevel)
         {
             PlayerPrefs.SetInt("CurrentLevel", playingLevel + 1);
             PlayerPrefs.Save();
@@ -194,7 +202,48 @@ public class GameManager : MonoBehaviour
             if (bot != null) Destroy(bot.gameObject);
             return;
         }
+
+        if (playingLevel == 5 && bot != null)
+        {
+            if (bot.IsPurple)
+            {
+                Destroy(bot.gameObject);
+                purpleAlive--;
+                if (purpleAlive <= 0) TriggerVictory();
+                return;
+            }
+            if (!purpleSpawned)
+            {
+                // Red ship sinks and splits into 2 purple ships at the same spot
+                purpleSpawned = true;
+                Vector3    pos = bot.transform.position;
+                Quaternion rot = bot.transform.rotation;
+                Vector3    right = bot.transform.right;
+                Destroy(bot.gameObject);
+                SpawnPurpleShips(pos, rot, right);
+                if (purpleAlive > 0) return;
+            }
+        }
         TriggerVictory();
+    }
+
+    void SpawnPurpleShips(Vector3 pos, Quaternion rot, Vector3 right)
+    {
+        if (botShipPrefab == null) return;
+        ShakeCamera(0.3f, 0.3f);
+        if (botHPGroup != null) botHPGroup.SetActive(false);
+        right.y = 0f;
+        right = right.sqrMagnitude > 0.0001f ? right.normalized : Vector3.right;
+        for (int i = 0; i < PurpleSplitCount; i++)
+        {
+            float   side     = i == 0 ? -1f : 1f;
+            Vector3 spawnPos = pos + right * side * PurpleSplitOffset;
+            spawnPos.y = 0f;
+            var go  = Instantiate(botShipPrefab, spawnPos, rot);
+            var bs  = go.GetComponent<BotShip>();
+            if (bs != null) bs.spawnAsPurple = true; // read in BotShip.Start(), which runs next frame
+            purpleAlive++;
+        }
     }
 
     void ShowEndPanel(string message)
@@ -214,7 +263,7 @@ public class GameManager : MonoBehaviour
     public void PlayAgain()
     {
         Time.timeScale = 1f;
-        MainMenu.levelToPlay = wonLastGame && playingLevel < 4 ? playingLevel + 1 : playingLevel;
+        MainMenu.levelToPlay = wonLastGame && playingLevel < MaxLevel ? playingLevel + 1 : playingLevel;
         SceneManager.LoadScene("GameScene");
     }
 
