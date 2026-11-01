@@ -20,11 +20,11 @@ public class LightningBolt : MonoBehaviour
 
     IEnumerator Flash()
     {
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 7; i++)
         {
             DrawBolt();
             _lr.enabled = true;
-            yield return new WaitForSecondsRealtime(0.10f);
+            yield return new WaitForSecondsRealtime(0.12f);
             _lr.enabled = false;
             yield return new WaitForSecondsRealtime(0.23f);
         }
