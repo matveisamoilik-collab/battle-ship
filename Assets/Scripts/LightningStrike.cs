@@ -7,7 +7,7 @@ public class LightningStrike : MonoBehaviour
     [HideInInspector] public GameObject effectPrefab;
 
     private const float Interval      = 15f;
-    private const float WarningDelay  =  3f;
+    private const float WarningDelay  =  1.99f;
     private const float DamageRadius  = 12f;
     private const float StrikeDamage  =  1f;
 
