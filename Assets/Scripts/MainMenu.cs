@@ -58,6 +58,11 @@ public class MainMenu : MonoBehaviour
     private const string PikeCode       = "щука";  // Russian for "pike"
     private const int    PikeCodeReward = 250;
 
+    // "100box": one-time code granting free loot boxes (not in s_validPromoCodes — it gives no coins)
+    private const string FreeBoxCode       = "100box";
+    private const string FreeBoxCodeKey    = "Promo_100box";
+    private const int    FreeBoxCodeAmount = 100;
+
     static int RewardFor(string code) => code == PikeCode ? PikeCodeReward : PromoCodeReward;
 
     // PlayerPrefs key per code; Cyrillic codes get an ASCII key to stay safe on every platform's prefs store
@@ -308,6 +313,12 @@ public class MainMenu : MonoBehaviour
                     PlayerPrefs.SetString("SelectedShip", "blue");
                 refunded++;
             }
+            if (PlayerPrefs.GetInt(FreeBoxCodeKey, 0) == 1)
+            {
+                PlayerPrefs.SetInt(FreeBoxCodeKey, 0);
+                PlayerPrefs.SetInt(LootBox.FreeBoxesKey, 0);
+                refunded++;
+            }
             PlayerPrefs.Save();
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.cyan;
@@ -325,6 +336,24 @@ public class MainMenu : MonoBehaviour
             promoFeedbackText.text  = "Level reset to 1.";
             if (levelText != null)
                 levelText.text = "LEVEL: 1";
+            return;
+        }
+
+        if (code == FreeBoxCode)
+        {
+            if (PlayerPrefs.GetInt(FreeBoxCodeKey, 0) == 1)
+            {
+                promoFeedbackText.color = new Color(1f, 0.6f, 0f);
+                promoFeedbackText.text  = "Already used.";
+                return;
+            }
+            PlayerPrefs.SetInt(FreeBoxCodeKey, 1);
+            LootBox.AddFreeBoxes(FreeBoxCodeAmount); // also saves
+            SoundManager.Play("coins");
+            promoCodeInput.text     = "";
+            promoFeedbackText.color = Color.green;
+            promoFeedbackText.text  = $"+{FreeBoxCodeAmount} FREE LOOT BOXES!";
+            RefreshShopUI();
             return;
         }
 

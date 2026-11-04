@@ -20,6 +20,8 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"PiratShipOwned"` | int | 0 | 1 = pirate ship purchased |
 | `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, `"yellowred"`, `"pirat"`, or `"white"` |
 | `"Promo_pizza1"` … `"Promo_pizza8"`, `"Promo_godship"`, `"Promo_shchuka"` | int | 0 | 1 = promo code already redeemed (`щука` uses the ASCII key `Promo_shchuka`) |
+| `"FreeBoxes"` | int | 0 | Free loot boxes left (granted by `100box`; spent before coins) |
+| `"Promo_100box"` | int | 0 | 1 = `100box` already redeemed |
 | `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–5 (`GameManager.MaxLevel = 5`) |
 
 ## Development Workflow
@@ -69,12 +71,13 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 - **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
 - **`godship` special case**: also sets `"WhiteShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
 - **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts each code's `RewardFor(code)` coins and clears the PlayerPrefs flag for each redeemed code; if `pizza1` was reset, also clears `"YellowRedShipOwned"`; if `godship` was reset, also clears `"WhiteShipOwned"`; also resets `"PiratShipOwned"` and deducts 200 coins if owned. Reverts `"SelectedShip"` to `"blue"` if any reset ship was selected. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
+- **`100box` special code**: not in `s_validPromoCodes` (gives no coins); handled in `OnRedeemPromoCode()` before the valid-code check. One-time (`"Promo_100box"`): grants 100 free loot boxes via `LootBox.AddFreeBoxes(100)`. `resett` clears its flag and sets `"FreeBoxes"` to 0.
 - **`resetl` special code**: not in `s_validPromoCodes`; handled in `OnRedeemPromoCode()` before the valid-code check. Sets `"CurrentLevel"` to 1 and immediately updates `MainMenu.levelText` to "LEVEL: 1" so the top-right HUD reflects the reset without a scene reload. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **Future-proofing**: add new codes to `s_validPromoCodes` and `resett` covers them automatically. If a new code unlocks a ship, add the ship-revocation logic to the `pizza1WasReset`-style check in the `resett` block.
 
 **Loot Box tab** (`LootBox.cs`, component on the `ShopPanel` root; tab content built by `GameSetup.BuildLootBoxContent()`):
 - "SEA CHEST" card (chest drawn from Images) with price + OPEN button on the left, POSSIBLE DROPS table on the right. The table rows are generated from `LootBox.Drops`, so the displayed odds always match the real ones.
-- Costs `LootBox.Price` = **65 coins**, unlimited purchases. OPEN is disabled when coins < 65 (`LootBox.RefreshButton()`, also called from `RefreshShopUI()`).
+- Costs `LootBox.Price` = **65 coins**, unlimited purchases. **Free boxes** (`LootBox.FreeBoxes`, PlayerPrefs `"FreeBoxes"`) are spent first — OPEN / OPEN AGAIN then read "(FREE)". A small red **"BOXES: N"** badge sits in the top-right of the chest card (built at runtime by `LootBox.EnsureCounter()`, updated in `RefreshButton()`). OPEN is disabled when there are no free boxes and coins < 65 (`LootBox.RefreshButton()`, also called from `RefreshShopUI()`).
 - Drop table (`LootBox.Drops`, chances sum to 100): 15 coins 49.5 % (gray) · 50 coins 16.5 % (light blue) · 100 coins 12.5 % (blue) · yellow ship 11.5 % (purple) · pirate ship 5.5 % (pink) · 250 coins 4 % (gold) · 1000 coins 0.5 % (red).
 - Already-owned ship drops are refunded at sell price instead: yellow → 75 coins, pirate → 100 coins.
 - The reward is rolled and saved **immediately** when OPEN is pressed (quitting mid-animation never loses it); the coin counter is held back until the reveal. `CoinManager.AddCoins(amount, playSound: false)` is used for the silent grant.

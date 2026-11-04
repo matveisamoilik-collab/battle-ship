@@ -24,6 +24,16 @@ public class LootBox : MonoBehaviour
 
     public const int Price = 65;
 
+    // Free boxes (granted by the "100box" promo code) are spent before coins.
+    public const string FreeBoxesKey = "FreeBoxes";
+    public static int  FreeBoxes => PlayerPrefs.GetInt(FreeBoxesKey, 0);
+    public static void AddFreeBoxes(int amount)
+    {
+        PlayerPrefs.SetInt(FreeBoxesKey, Mathf.Max(0, FreeBoxes + amount));
+        PlayerPrefs.Save();
+    }
+    static bool CanOpen => FreeBoxes > 0 || (CoinManager.Instance != null && CoinManager.Instance.Coins >= Price);
+
     // Ships already owned are refunded at their sell price instead.
     public const int YellowDuplicateCoins = 75;
     public const int PiratDuplicateCoins  = 100;
@@ -68,18 +78,42 @@ public class LootBox : MonoBehaviour
     Button        againButton;
     Font          font;
     bool          spinning;
+    Text          counterText;
 
     void OnEnable() { RefreshButton(); }
 
     public void RefreshButton()
     {
+        int free = FreeBoxes;
         if (openButton != null)
-            openButton.interactable = !spinning && CoinManager.Instance != null && CoinManager.Instance.Coins >= Price;
+        {
+            openButton.interactable = !spinning && CanOpen;
+            var label = openButton.GetComponentInChildren<Text>();
+            if (label != null) label.text = free > 0 ? "OPEN (FREE)" : "OPEN";
+        }
+        EnsureCounter();
+        if (counterText != null)
+        {
+            counterText.text  = "BOXES: " + free;
+            counterText.color = free > 0 ? Color.white : new Color(1f, 1f, 1f, 0.45f);
+        }
+    }
+
+    // Small "BOXES: N" badge in the top-right corner of the chest card (built at runtime — no Build All needed).
+    void EnsureCounter()
+    {
+        if (counterText != null || openButton == null) return;
+        if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var badge = NewUI("FreeBoxCounter", openButton.transform.parent, new Vector2(0.62f, 0.73f), new Vector2(0.97f, 0.84f));
+        badge.AddComponent<Image>().color = new Color(0.75f, 0.15f, 0.15f, 0.9f);
+        badge.GetComponent<Image>().raycastTarget = false;
+        counterText = NewText("Text", badge.transform, "", 20, Color.white, Vector2.zero, Vector2.one);
+        counterText.fontStyle = FontStyle.Bold;
     }
 
     public void OnOpenClicked()
     {
-        if (spinning || CoinManager.Instance == null || CoinManager.Instance.Coins < Price) return;
+        if (spinning || !CanOpen) return;
         StartCoroutine(OpenRoutine());
     }
 
@@ -129,7 +163,8 @@ public class LootBox : MonoBehaviour
         spinning = true;
         RefreshButton();
 
-        CoinManager.Instance.AddCoins(-Price);
+        if (FreeBoxes > 0) AddFreeBoxes(-1);
+        else               CoinManager.Instance.AddCoins(-Price);
         Drop   win   = Roll();
         string label = Grant(win, out int granted);
         SetCoinsText(CoinManager.Instance.Coins - granted); // hide the prize until the reveal
@@ -199,7 +234,9 @@ public class LootBox : MonoBehaviour
         spinning = false;
         okButton.SetActive(true);
         againButton.gameObject.SetActive(true);
-        againButton.interactable = CoinManager.Instance.Coins >= Price;
+        againButton.interactable = CanOpen;
+        againButton.GetComponentInChildren<Text>().text =
+            FreeBoxes > 0 ? "OPEN AGAIN (FREE)" : "OPEN AGAIN (" + Price + ")";
         if (menu != null) menu.RefreshShopUI();
         RefreshButton();
     }
