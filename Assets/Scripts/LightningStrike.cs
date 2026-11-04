@@ -86,6 +86,7 @@ public class LightningStrike : MonoBehaviour
             Instantiate(effectPrefab, _strikePos, Quaternion.identity);
 
         GameManager.Instance?.ShakeCamera(0.4f, 0.35f);
+        SoundManager.Play("thunder", 1f, 0.05f);
         // Damage is applied per flash by the main LightningBolt (see LightningBolt.SetDamage)
     }
 }

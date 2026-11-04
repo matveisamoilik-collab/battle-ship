@@ -272,6 +272,15 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 ### Adding New Islands
 Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int treeCount, mats, Transform parent = null)`. Each island root gets an `IslandData` component (runtime data) and the `"Island"` tag. All calls in `BuildGameScene()` pass `islandsRootGO.transform` as the parent so the levels system can toggle them. To add an island: add a `CreateIsland(...)` call in `BuildGameScene()` with `islandsRootGO.transform` as the parent — no other changes needed.
 
+### Sound
+
+`SoundManager.cs` is a self-bootstrapping `DontDestroyOnLoad` singleton (`[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`) — it is **not** in any scene and needs no Build All. It loads clips by name from `Assets/Resources/Sounds/<name>.ogg` (all CC0 from OpenGameArt; see `SOUND_CREDITS.md`).
+- `SoundManager.Play(name, volume, pitchJitter, pitch)` — 2D one-shot from a 12-source pool. `SoundManager.PlayAt(name, worldPos, ...)` — same, volume falls off with distance from `Camera.main` (floor 0.3 at 160 units). Sources ignore `Time.timeScale`, so end-panel jingles play while paused.
+- Looping `ocean_loop` ambience (volume 0.25) plays in every scene.
+- Every `Button` in each loaded scene (including inactive panels) gets a `click` sound automatically via `sceneLoaded`.
+- Hooks: torpedo fire (player/bot) → `torpedo_fire`; torpedo hits ship → `hit_ship`, hits island/wall → `hit_island`; ship sunk → `big_explosion` + `ship_sink`; new island contact → `island_crash`; victory/defeat → `victory` / `defeat`; `CoinManager.AddCoins` → `coins`; volcano launch → `big_explosion` (pitch 0.7), stone impact → `splash`; lightning → `thunder`; anchor throw / hook / reel → `anchor_throw` / `anchor_hook` / `anchor_reel`.
+- To add a sound: drop `<name>.ogg` into `Assets/Resources/Sounds/` and call `SoundManager.Play("<name>")`.
+
 ### Rendering
 Two URP quality tiers:
 - `PC_RPAsset` / `PC_Renderer` — full-quality desktop rendering

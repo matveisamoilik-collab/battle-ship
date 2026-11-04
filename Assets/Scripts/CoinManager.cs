@@ -22,6 +22,7 @@ public class CoinManager : MonoBehaviour
     public void AddCoins(int amount)
     {
         Coins += amount;
+        if (amount != 0) SoundManager.Play("coins", 0.7f);
         PlayerPrefs.SetInt(PrefsKey, Coins);
         PlayerPrefs.Save();
     }

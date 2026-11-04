@@ -33,6 +33,7 @@ public class VolcanoStone : MonoBehaviour
 
         if (splashPrefab != null)
             Instantiate(splashPrefab, pos, Quaternion.identity);
+        SoundManager.PlayAt("splash", pos, 1f);
 
         GameManager.Instance?.ShakeCamera(0.35f, 0.3f);
 

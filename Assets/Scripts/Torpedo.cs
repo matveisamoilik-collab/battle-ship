@@ -48,6 +48,7 @@ public class Torpedo : MonoBehaviour
         else if (!root.CompareTag("Player") && !root.CompareTag("Enemy"))
         {
             // Hit a wall, the water, or any other object — just explode
+            SoundManager.PlayAt("hit_island", transform.position, 0.6f);
             SpawnExplosion();
             Destroy(gameObject);
         }
@@ -56,6 +57,7 @@ public class Torpedo : MonoBehaviour
 
     void HitEffect()
     {
+        SoundManager.PlayAt("hit_ship", transform.position, 1f);
         SpawnExplosion();
         if (GameManager.Instance != null)
             GameManager.Instance.ShakeCamera(0.3f, 0.3f);

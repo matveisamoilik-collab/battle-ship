@@ -66,7 +66,11 @@ public class AnchorHook : MonoBehaviour
         {
             case State.Idle:
                 timer += Time.deltaTime;
-                if (timer >= Interval) state = State.Flying;
+                if (timer >= Interval)
+                {
+                    state = State.Flying;
+                    SoundManager.PlayAt("anchor_throw", anchor.position, 1f);
+                }
                 break;
 
             case State.Flying:
@@ -80,6 +84,7 @@ public class AnchorHook : MonoBehaviour
                     player.BeginPull(new Vector3(c.x, 0f, c.z), PullSpeed);
                     pullTime = 0f;
                     state    = State.Pulling;
+                    SoundManager.Play("anchor_hook", 1f);
                     GameManager.Instance.ShakeCamera(0.2f, 0.4f);
                 }
                 break;
@@ -93,6 +98,7 @@ public class AnchorHook : MonoBehaviour
                     player.EndPull();
                     GameManager.Instance.ShakeCamera(0.4f, 1.0f);
                     state = State.Returning;
+                    SoundManager.PlayAt("anchor_reel", anchor.position, 0.9f);
                 }
                 break;
 

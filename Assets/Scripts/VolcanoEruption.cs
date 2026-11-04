@@ -40,6 +40,7 @@ public class VolcanoEruption : MonoBehaviour
         Vector3 horiz  = (target - new Vector3(VolcanoTop.x, 0f, VolcanoTop.z)) / tof;
         Vector3 velocity = new Vector3(horiz.x, VertSpeed, horiz.z);
 
+        SoundManager.PlayAt("big_explosion", VolcanoTop, 0.7f, 0.08f, 0.7f); // deep eruption boom
         var go = Instantiate(stonePrefab, VolcanoTop, Random.rotation);
         var stone = go.GetComponent<VolcanoStone>();
         if (stone != null) stone.Launch(velocity);

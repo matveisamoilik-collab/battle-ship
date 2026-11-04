@@ -309,6 +309,7 @@ public class BotShip : MonoBehaviour
         GameObject t = Instantiate(torpedoPrefab, torpedoSpawnPoint.position, aimRot);
         Torpedo torpedo = t.GetComponent<Torpedo>();
         if (torpedo != null) { torpedo.isPlayerTorpedo = false; torpedo.damage = torpedoDamage; }
+        SoundManager.PlayAt("torpedo_fire", transform.position, 0.6f, 0.05f, 0.9f);
 
         nextFireTime = Time.time + Random.Range(currentFireDelay * 0.8f, currentFireDelay * 1.2f);
     }
@@ -321,6 +322,8 @@ public class BotShip : MonoBehaviour
         if (currentHP <= 0f && !defeated && GameManager.Instance != null)
         {
             defeated = true;
+            SoundManager.PlayAt("big_explosion", transform.position, 1f);
+            SoundManager.PlayAt("ship_sink", transform.position, 0.8f);
             GameManager.Instance.BotDefeated(this);
         }
     }

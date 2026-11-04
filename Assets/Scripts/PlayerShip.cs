@@ -254,6 +254,8 @@ public class PlayerShip : MonoBehaviour
 
         // From Level 5 on, every new island collision (manual or anchor pull) costs HP.
         // Damage fires only on the frame contact begins, not every frame while scraping along the coast.
+        if (touching && !wasTouchingIsland)
+            SoundManager.Play("island_crash", 0.7f);
         if (touching && !wasTouchingIsland && GameManager.Instance != null
             && GameManager.Instance.PlayingLevel >= IslandCrashDamageFromLevel)
             TakeDamage(IslandCrashDamage);
@@ -285,6 +287,7 @@ public class PlayerShip : MonoBehaviour
                                    torpedoSpawnPoint.rotation);
         Torpedo torpedo = t.GetComponent<Torpedo>();
         if (torpedo != null) { torpedo.isPlayerTorpedo = true; torpedo.damage = torpedoDamage; }
+        SoundManager.Play("torpedo_fire", 0.8f);
     }
 
     public void TakeDamage(float amount)
@@ -293,6 +296,13 @@ public class PlayerShip : MonoBehaviour
         currentHP = Mathf.Max(0f, currentHP);
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
         if (currentHP <= 0f && GameManager.Instance != null)
+        {
+            if (!GameManager.Instance.IsGameOver)
+            {
+                SoundManager.Play("big_explosion", 1f);
+                SoundManager.Play("ship_sink", 0.8f);
+            }
             GameManager.Instance.PlayerDefeated();
+        }
     }
 }

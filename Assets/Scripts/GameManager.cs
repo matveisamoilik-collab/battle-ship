@@ -176,6 +176,7 @@ public class GameManager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
+        SoundManager.Play("victory", 0.9f, 0f);
         ShowEndPanel("VICTORY!");
     }
 
@@ -191,6 +192,7 @@ public class GameManager : MonoBehaviour
         gameOver = true;
         CoinManager.Instance?.AddCoins(1);
         UpdateCoinsText();
+        SoundManager.Play("defeat", 0.9f, 0f);
         ShowEndPanel("DEFEATED");
     }
 
