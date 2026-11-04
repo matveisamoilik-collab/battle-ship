@@ -19,10 +19,10 @@ public class CoinManager : MonoBehaviour
         Coins = PlayerPrefs.GetInt(PrefsKey, 0);
     }
 
-    public void AddCoins(int amount)
+    public void AddCoins(int amount, bool playSound = true)
     {
         Coins += amount;
-        if (amount != 0) SoundManager.Play("coins", 0.7f);
+        if (playSound && amount != 0) SoundManager.Play("coins", 0.7f);
         PlayerPrefs.SetInt(PrefsKey, Coins);
         PlayerPrefs.Save();
     }

@@ -19,7 +19,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"WhiteShipOwned"` | int | 0 | 1 = white ship unlocked via `godship` |
 | `"PiratShipOwned"` | int | 0 | 1 = pirate ship purchased |
 | `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, `"yellowred"`, `"pirat"`, or `"white"` |
-| `"Promo_pizza1"` … `"Promo_pizza8"`, `"Promo_godship"` | int | 0 | 1 = promo code already redeemed |
+| `"Promo_pizza1"` … `"Promo_pizza8"`, `"Promo_godship"`, `"Promo_shchuka"` | int | 0 | 1 = promo code already redeemed (`щука` uses the ASCII key `Promo_shchuka`) |
 | `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–5 (`GameManager.MaxLevel = 5`) |
 
 ## Development Workflow
@@ -60,17 +60,25 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 
 The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `BuildShopPanel()` inside `GameSetup.cs`. All shop state is driven by `MainMenu.RefreshShopUI()` — this is the single method that reads PlayerPrefs and sets `SetActive` / `interactable` on every shop widget. Call it whenever state might have changed (on open, after buy, after sell, after select, after promo redemption).
 
-**Two tabs** (content panels toggled via `ShowToBuyTab()` / `ShowBoughtTab()`):
+**Four tabs** — TO BUY / BOUGHT / STATS / LOOT BOX (content panels toggled via `ShowToBuyTab()` / `ShowBoughtTab()` / `ShowStatsTab()` / `ShowLootBoxTab()`; each hides the other three):
 - **To Buy** — shows ship cards for purchasable unowned ships (top area), plus a **Promo Code section** at the bottom (anchors 0.02–0.98 × 0.02–0.50 within ToBuyContent). The promo section has a label, a legacy `InputField`, a REDEEM button, and a feedback `Text`.
 - **Bought** — shows all owned ships. Blue ship is always present. Each purchasable ship's card has: SELECT button + SELL button (both hidden when that ship is selected; replaced by "✓ SELECTED" label). Selling is blocked on the currently selected ship.
 
-**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are defined in the static array `MainMenu.s_validPromoCodes` (`pizza1`–`pizza8`, `godship`). Each grants +5 coins once; used codes are tracked in PlayerPrefs (`"Promo_<code>"`). Feedback: green on success, orange for already-used, red for invalid.
+**Promo codes** (`MainMenu.OnRedeemPromoCode()`): valid codes are defined in the static array `MainMenu.s_validPromoCodes` (`pizza1`–`pizza8`, `godship`, `щука`). Each grants +5 coins once — except `щука`, which grants **+250** (`RewardFor(code)`); used codes are tracked in PlayerPrefs via `PromoPrefsKey(code)` (`"Promo_<code>"`, or `"Promo_shchuka"` for `щука`). Input is lower-cased with `ToLowerInvariant()`, so `ЩУКА` also works. Feedback: green on success, orange for already-used, red for invalid.
 
 - **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
 - **`godship` special case**: also sets `"WhiteShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
-- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts `PromoCodeReward` coins and clears the PlayerPrefs flag for each redeemed code; if `pizza1` was reset, also clears `"YellowRedShipOwned"`; if `godship` was reset, also clears `"WhiteShipOwned"`; also resets `"PiratShipOwned"` and deducts 200 coins if owned. Reverts `"SelectedShip"` to `"blue"` if any reset ship was selected. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
+- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts each code's `RewardFor(code)` coins and clears the PlayerPrefs flag for each redeemed code; if `pizza1` was reset, also clears `"YellowRedShipOwned"`; if `godship` was reset, also clears `"WhiteShipOwned"`; also resets `"PiratShipOwned"` and deducts 200 coins if owned. Reverts `"SelectedShip"` to `"blue"` if any reset ship was selected. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **`resetl` special code**: not in `s_validPromoCodes`; handled in `OnRedeemPromoCode()` before the valid-code check. Sets `"CurrentLevel"` to 1 and immediately updates `MainMenu.levelText` to "LEVEL: 1" so the top-right HUD reflects the reset without a scene reload. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **Future-proofing**: add new codes to `s_validPromoCodes` and `resett` covers them automatically. If a new code unlocks a ship, add the ship-revocation logic to the `pizza1WasReset`-style check in the `resett` block.
+
+**Loot Box tab** (`LootBox.cs`, component on the `ShopPanel` root; tab content built by `GameSetup.BuildLootBoxContent()`):
+- "SEA CHEST" card (chest drawn from Images) with price + OPEN button on the left, POSSIBLE DROPS table on the right. The table rows are generated from `LootBox.Drops`, so the displayed odds always match the real ones.
+- Costs `LootBox.Price` = **65 coins**, unlimited purchases. OPEN is disabled when coins < 65 (`LootBox.RefreshButton()`, also called from `RefreshShopUI()`).
+- Drop table (`LootBox.Drops`, chances sum to 100): 15 coins 49.5 % (gray) · 50 coins 16.5 % (light blue) · 100 coins 12.5 % (blue) · yellow ship 11.5 % (purple) · pirate ship 5.5 % (pink) · 250 coins 4 % (gold) · 1000 coins 0.5 % (red).
+- Already-owned ship drops are refunded at sell price instead: yellow → 75 coins, pirate → 100 coins.
+- The reward is rolled and saved **immediately** when OPEN is pressed (quitting mid-animation never loses it); the coin counter is held back until the reveal. `CoinManager.AddCoins(amount, playSound: false)` is used for the silent grant.
+- **Opening animation** (case-roulette style): a full-shop overlay built at runtime (`LootBox.EnsureOverlay()`) with a masked horizontal strip of 60 reward tiles (rarity-tinted, rarity bar at the bottom, coin diamond or mini ship icon). The rolled reward sits at tile 50; the strip scrolls with a quartic ease-out over 6.5 s (unscaled time) and stops at a random point inside the winning tile under a gold centre marker. A tick (`click`, pitch 1.35) plays each time a tile passes the marker. Reveal: winning tile pulses, "YOU GOT: …" in the rarity colour, `victory` sound for ships / ≤10 % drops, otherwise `coins`. Then OK (close) and OPEN AGAIN (65) buttons appear.
 
 **Ship card pattern in Bought tab:**
 - Standard (purchasable) ships — blue, yellow: ColorSwatch `(0.05,0.45)–(0.95,0.92)`, ShipNameText `(0,0.30)–(1,0.43)`, bottom strip `(0.04–0.26)`: SELECT (left, 0.05–0.52) + SELL (right, 0.55–0.95, red tint), replaced by "✓ SELECTED" label when selected.
@@ -198,7 +206,8 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Yellow ship sell price | 75 coins (half price) |
 | Pirate ship cost | 200 coins |
 | Pirate ship sell price | 100 coins (half price) |
-| Promo code reward | 5 coins |
+| Promo code reward | 5 coins (`щука`: 250 coins) |
+| Loot box price | 65 coins (unlimited) |
 
 ### Arena & Environment
 - **Sea plane**: 2000×2000 units (scale 200), covers the full visible horizon

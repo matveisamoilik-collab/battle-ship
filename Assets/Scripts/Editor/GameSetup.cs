@@ -1833,27 +1833,35 @@ public static class GameSetup
         closeRT.sizeDelta        = Vector2.zero;
         closeRT.anchoredPosition = Vector2.zero;
 
-        // Tab buttons — three tabs across the top strip
+        // Tab buttons — four tabs across the top strip
         var toBuyTabGO = MakeButton("ToBuyTab", shopPanelGO.transform, "TO BUY");
         var toBuyTabRT = toBuyTabGO.GetComponent<RectTransform>();
         toBuyTabRT.anchorMin        = new Vector2(0.02f, 0.82f);
-        toBuyTabRT.anchorMax        = new Vector2(0.31f, 0.92f);
+        toBuyTabRT.anchorMax        = new Vector2(0.24f, 0.92f);
         toBuyTabRT.sizeDelta        = Vector2.zero;
         toBuyTabRT.anchoredPosition = Vector2.zero;
 
         var boughtTabGO = MakeButton("BoughtTab", shopPanelGO.transform, "BOUGHT");
         var boughtTabRT = boughtTabGO.GetComponent<RectTransform>();
-        boughtTabRT.anchorMin        = new Vector2(0.35f, 0.82f);
-        boughtTabRT.anchorMax        = new Vector2(0.64f, 0.92f);
+        boughtTabRT.anchorMin        = new Vector2(0.26f, 0.82f);
+        boughtTabRT.anchorMax        = new Vector2(0.49f, 0.92f);
         boughtTabRT.sizeDelta        = Vector2.zero;
         boughtTabRT.anchoredPosition = Vector2.zero;
 
         var statsTabGO = MakeButton("StatsTab", shopPanelGO.transform, "STATS");
         var statsTabRT = statsTabGO.GetComponent<RectTransform>();
-        statsTabRT.anchorMin        = new Vector2(0.68f, 0.82f);
-        statsTabRT.anchorMax        = new Vector2(0.98f, 0.92f);
+        statsTabRT.anchorMin        = new Vector2(0.51f, 0.82f);
+        statsTabRT.anchorMax        = new Vector2(0.74f, 0.92f);
         statsTabRT.sizeDelta        = Vector2.zero;
         statsTabRT.anchoredPosition = Vector2.zero;
+
+        var lootTabGO = MakeButton("LootBoxTab", shopPanelGO.transform, "LOOT BOX");
+        var lootTabRT = lootTabGO.GetComponent<RectTransform>();
+        lootTabRT.anchorMin        = new Vector2(0.76f, 0.82f);
+        lootTabRT.anchorMax        = new Vector2(0.98f, 0.92f);
+        lootTabRT.sizeDelta        = Vector2.zero;
+        lootTabRT.anchoredPosition = Vector2.zero;
+        lootTabGO.GetComponent<Image>().color = new Color(0.75f, 0.50f, 0.10f, 1f); // gold — stands out
 
         // ToBuy content panel
         var toBuyContentGO = new GameObject("ToBuyContent");
@@ -2362,6 +2370,12 @@ public static class GameSetup
 
         statsContentGO.SetActive(false);
 
+        var lootBox = shopPanelGO.AddComponent<LootBox>();
+        var lootContentGO = BuildLootBoxContent(shopPanelGO.transform, out var lootOpenBtn);
+        lootBox.menu       = script;
+        lootBox.openButton = lootOpenBtn;
+        lootContentGO.SetActive(false);
+
         // Assign MainMenu fields
         script.shopPanel              = shopPanelGO;
         script.toBuyContent           = toBuyContentGO;
@@ -2389,6 +2403,8 @@ public static class GameSetup
         script.promoCodeInput             = promoInputField;
         script.promoFeedbackText          = promoFeedbackGO.GetComponent<Text>();
         script.statsContent               = statsContentGO;
+        script.lootBoxContent             = lootContentGO;
+        script.lootBox                    = lootBox;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(
@@ -2403,6 +2419,10 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             statsTabGO.GetComponent<Button>().onClick,
             script.ShowStatsTab);
+        UnityEventTools.AddPersistentListener(
+            lootTabGO.GetComponent<Button>().onClick,
+            script.ShowLootBoxTab);
+        UnityEventTools.AddPersistentListener(lootOpenBtn.onClick, lootBox.OnOpenClicked);
         UnityEventTools.AddPersistentListener(
             buyBtnGO.GetComponent<Button>().onClick,
             script.OnBuyYellowShipClicked);
@@ -2439,6 +2459,91 @@ public static class GameSetup
         boughtContentGO.SetActive(true);
 
         return shopPanelGO;
+    }
+
+    // Loot box tab: chest card (left) with OPEN button + drop-chance table (right).
+    // Drop rows come from LootBox.Drops so the table always matches the real odds.
+    static GameObject BuildLootBoxContent(Transform shopPanel, out Button openButton)
+    {
+        var content = new GameObject("LootBoxContent");
+        content.transform.SetParent(shopPanel, false);
+        var contentRT = content.AddComponent<RectTransform>();
+        contentRT.anchorMin = new Vector2(0.02f, 0.05f);
+        contentRT.anchorMax = new Vector2(0.98f, 0.80f);
+        contentRT.offsetMin = contentRT.offsetMax = Vector2.zero;
+
+        GameObject MakeRect(string name, Transform parent, Color color, Vector2 aMin, Vector2 aMax)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<Image>().color = color;
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = aMin;
+            rt.anchorMax = aMax;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            return go;
+        }
+        void Place(GameObject go, Vector2 aMin, Vector2 aMax)
+        {
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = aMin;
+            rt.anchorMax = aMax;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        // Chest card
+        var card = MakeRect("ChestCard", content.transform, new Color(0.18f, 0.12f, 0.06f, 1f),
+                        new Vector2(0.02f, 0.02f), new Vector2(0.42f, 0.98f));
+        var gold  = new Color(1.00f, 0.78f, 0.20f);
+        var wood  = new Color(0.50f, 0.30f, 0.12f);
+        var woodD = new Color(0.36f, 0.20f, 0.08f);
+        MakeRect("ChestBody", card.transform, wood,  new Vector2(0.18f, 0.40f), new Vector2(0.82f, 0.66f));
+        MakeRect("ChestLid",  card.transform, woodD, new Vector2(0.15f, 0.66f), new Vector2(0.85f, 0.82f));
+        MakeRect("BandLeft",  card.transform, gold,  new Vector2(0.27f, 0.40f), new Vector2(0.31f, 0.82f));
+        MakeRect("BandRight", card.transform, gold,  new Vector2(0.69f, 0.40f), new Vector2(0.73f, 0.82f));
+        MakeRect("Lock",      card.transform, gold,  new Vector2(0.45f, 0.58f), new Vector2(0.55f, 0.72f));
+
+        var nameGO = MakeText("ChestName", card.transform, "SEA CHEST", 30, Color.white);
+        Place(nameGO, new Vector2(0f, 0.85f), new Vector2(1f, 0.98f));
+        nameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var priceGO = MakeText("PriceText", card.transform, LootBox.Price + " COINS", 24, Color.yellow);
+        Place(priceGO, new Vector2(0f, 0.26f), new Vector2(1f, 0.37f));
+
+        var openGO = MakeButton("OpenButton", card.transform, "OPEN");
+        Place(openGO, new Vector2(0.10f, 0.04f), new Vector2(0.90f, 0.22f));
+        openGO.GetComponent<Image>().color = new Color(0.85f, 0.55f, 0.10f, 1f);
+        openButton = openGO.GetComponent<Button>();
+
+        // Drop table
+        var table = MakeRect("DropTable", content.transform, new Color(0.08f, 0.08f, 0.18f, 0.85f),
+                         new Vector2(0.46f, 0.02f), new Vector2(0.98f, 0.98f));
+        var hdrGO = MakeText("Header", table.transform, "POSSIBLE DROPS", 26, Color.white);
+        Place(hdrGO, new Vector2(0f, 0.86f), new Vector2(1f, 0.98f));
+        hdrGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var drops = LootBox.Drops;
+        float rowH = 0.82f / drops.Length;
+        for (int i = 0; i < drops.Length; i++)
+        {
+            float top = 0.84f - i * rowH;
+            var row = MakeRect("Row" + i, table.transform, new Color(0.12f, 0.12f, 0.24f, 1f),
+                           new Vector2(0.03f, top - rowH + 0.012f), new Vector2(0.97f, top));
+            MakeRect("RarityBar", row.transform, drops[i].rarity, new Vector2(0f, 0f), new Vector2(0.025f, 1f));
+
+            var n = MakeText("Name", row.transform, drops[i].name, 22, drops[i].rarity);
+            Place(n, new Vector2(0.05f, 0f), new Vector2(0.75f, 1f));
+            var nt = n.GetComponent<Text>();
+            nt.alignment = TextAnchor.MiddleLeft;
+            nt.fontStyle = FontStyle.Bold;
+
+            var c = MakeText("Chance", row.transform, drops[i].chance.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%", 22, Color.white);
+            Place(c, new Vector2(0.75f, 0f), new Vector2(0.97f, 1f));
+            c.GetComponent<Text>().alignment = TextAnchor.MiddleRight;
+        }
+
+        return content;
     }
 
     // Creates a Button with a centered text label

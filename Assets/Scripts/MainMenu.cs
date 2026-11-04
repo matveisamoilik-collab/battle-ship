@@ -40,6 +40,8 @@ public class MainMenu : MonoBehaviour
     public Text       promoFeedbackText;
 
     public GameObject statsContent;
+    public GameObject lootBoxContent;
+    public LootBox    lootBox;
 
     // Map panel
     public static int levelToPlay = -1;
@@ -51,8 +53,15 @@ public class MainMenu : MonoBehaviour
     public Button     island5Button;
 
     private static readonly string[] s_validPromoCodes =
-        { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8","godship" };
+        { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8","godship", "щука" };
     private const int PromoCodeReward = 5;
+    private const string PikeCode       = "щука";  // Russian for "pike"
+    private const int    PikeCodeReward = 250;
+
+    static int RewardFor(string code) => code == PikeCode ? PikeCodeReward : PromoCodeReward;
+
+    // PlayerPrefs key per code; Cyrillic codes get an ASCII key to stay safe on every platform's prefs store
+    static string PromoPrefsKey(string code) => "Promo_" + (code == PikeCode ? "shchuka" : code);
 
     void Start()
     {
@@ -93,6 +102,7 @@ public class MainMenu : MonoBehaviour
         if (toBuyContent  != null) toBuyContent.SetActive(true);
         if (boughtContent != null) boughtContent.SetActive(false);
         if (statsContent  != null) statsContent.SetActive(false);
+        if (lootBoxContent != null) lootBoxContent.SetActive(false);
     }
 
     public void ShowBoughtTab()
@@ -100,6 +110,7 @@ public class MainMenu : MonoBehaviour
         if (toBuyContent  != null) toBuyContent.SetActive(false);
         if (boughtContent != null) boughtContent.SetActive(true);
         if (statsContent  != null) statsContent.SetActive(false);
+        if (lootBoxContent != null) lootBoxContent.SetActive(false);
     }
 
     public void ShowStatsTab()
@@ -107,6 +118,16 @@ public class MainMenu : MonoBehaviour
         if (toBuyContent  != null) toBuyContent.SetActive(false);
         if (boughtContent != null) boughtContent.SetActive(false);
         if (statsContent  != null) statsContent.SetActive(true);
+        if (lootBoxContent != null) lootBoxContent.SetActive(false);
+    }
+
+    public void ShowLootBoxTab()
+    {
+        if (toBuyContent  != null) toBuyContent.SetActive(false);
+        if (boughtContent != null) boughtContent.SetActive(false);
+        if (statsContent  != null) statsContent.SetActive(false);
+        if (lootBoxContent != null) lootBoxContent.SetActive(true);
+        if (lootBox != null) lootBox.RefreshButton();
     }
 
     public void RefreshShopUI()
@@ -118,6 +139,7 @@ public class MainMenu : MonoBehaviour
 
         if (coinsText != null && CoinManager.Instance != null)
             coinsText.text = "COINS: " + CoinManager.Instance.Coins;
+        if (lootBox != null) lootBox.RefreshButton();
 
         if (buyYellowShipButton != null)
             buyYellowShipButton.interactable =
@@ -247,7 +269,7 @@ public class MainMenu : MonoBehaviour
     {
         if (promoCodeInput == null || promoFeedbackText == null) return;
 
-        string code = promoCodeInput.text.Trim().ToLower();
+        string code = promoCodeInput.text.Trim().ToLowerInvariant();
 
         if (code == "resett")
         {
@@ -256,10 +278,10 @@ public class MainMenu : MonoBehaviour
             bool godshipWasReset  = false;
             foreach (var c in s_validPromoCodes)
             {
-                string key = "Promo_" + c;
+                string key = PromoPrefsKey(c);
                 if (PlayerPrefs.GetInt(key, 0) == 1)
                 {
-                    CoinManager.Instance?.AddCoins(-PromoCodeReward);
+                    CoinManager.Instance?.AddCoins(-RewardFor(c));
                     PlayerPrefs.SetInt(key, 0);
                     refunded++;
                     if (c == "pizza1")  pizza1WasReset  = true;
@@ -314,7 +336,8 @@ public class MainMenu : MonoBehaviour
             return;
         }
 
-        string prefsKey = "Promo_" + code;
+        string prefsKey = PromoPrefsKey(code);
+        int    reward   = RewardFor(code);
         if (PlayerPrefs.GetInt(prefsKey, 0) == 1)
         {
             promoFeedbackText.color = new Color(1f, 0.6f, 0f);
@@ -322,7 +345,7 @@ public class MainMenu : MonoBehaviour
             return;
         }
 
-        CoinManager.Instance?.AddCoins(PromoCodeReward);
+        CoinManager.Instance?.AddCoins(reward);
         PlayerPrefs.SetInt(prefsKey, 1);
         PlayerPrefs.Save();
         if (code == "pizza1")
@@ -347,7 +370,7 @@ public class MainMenu : MonoBehaviour
         }
         promoCodeInput.text     = "";
         promoFeedbackText.color = Color.green;
-        promoFeedbackText.text  = $"+{PromoCodeReward} COINS!";
+        promoFeedbackText.text  = $"+{reward} COINS!";
         RefreshShopUI();
     }
 
