@@ -29,6 +29,10 @@ public class MainMenu : MonoBehaviour
     public Button     whiteShipSelectButton;
     public Text       whiteShipSelectedLabel;
 
+    public GameObject sharkShipBoughtCard;
+    public Button     sharkShipSelectButton;
+    public Text       sharkShipSelectedLabel;
+
     public GameObject piratShipToBuyCard;
     public GameObject piratShipBoughtCard;
     public Button     buyPiratShipButton;
@@ -58,10 +62,10 @@ public class MainMenu : MonoBehaviour
     private const string PikeCode       = "щука";  // Russian for "pike"
     private const int    PikeCodeReward = 250;
 
-    // "100box": one-time code granting free loot boxes (not in s_validPromoCodes — it gives no coins)
-    private const string FreeBoxCode       = "100box";
-    private const string FreeBoxCodeKey    = "Promo_100box";
-    private const int    FreeBoxCodeAmount = 100;
+    // "10box": one-time code granting free loot boxes (not in s_validPromoCodes — it gives no coins)
+    private const string FreeBoxCode       = "10box";
+    private const string FreeBoxCodeKey    = "Promo_10box";
+    private const int    FreeBoxCodeAmount = 10;
 
     static int RewardFor(string code) => code == PikeCode ? PikeCodeReward : PromoCodeReward;
 
@@ -176,6 +180,13 @@ public class MainMenu : MonoBehaviour
         if (whiteShipSelectButton  != null) whiteShipSelectButton.gameObject.SetActive(whiteOwned && !whiteSelected);
         if (whiteShipSelectedLabel != null) whiteShipSelectedLabel.gameObject.SetActive(whiteOwned && whiteSelected);
 
+        bool sharkOwned    = PlayerPrefs.GetInt("SharkShipOwned", 0) == 1;
+        bool sharkSelected = selected == "shark";
+
+        if (sharkShipBoughtCard    != null) sharkShipBoughtCard.SetActive(sharkOwned);
+        if (sharkShipSelectButton  != null) sharkShipSelectButton.gameObject.SetActive(sharkOwned && !sharkSelected);
+        if (sharkShipSelectedLabel != null) sharkShipSelectedLabel.gameObject.SetActive(sharkOwned && sharkSelected);
+
         bool piratOwned    = PlayerPrefs.GetInt("PiratShipOwned", 0) == 1;
         bool piratSelected = selected == "pirat";
 
@@ -215,6 +226,13 @@ public class MainMenu : MonoBehaviour
     public void OnSelectWhiteShip()
     {
         PlayerPrefs.SetString("SelectedShip", "white");
+        PlayerPrefs.Save();
+        RefreshShopUI();
+    }
+
+    public void OnSelectSharkShip()
+    {
+        PlayerPrefs.SetString("SelectedShip", "shark");
         PlayerPrefs.Save();
         RefreshShopUI();
     }
@@ -303,6 +321,15 @@ public class MainMenu : MonoBehaviour
             {
                 PlayerPrefs.SetInt("WhiteShipOwned", 0);
                 if (PlayerPrefs.GetString("SelectedShip", "blue") == "white")
+                    PlayerPrefs.SetString("SelectedShip", "blue");
+            }
+            // Shark ship (loot box drop only) — no coins to deduct; also clears the flag of the removed "shark" promo code
+            if (PlayerPrefs.GetInt("SharkShipOwned", 0) == 1)
+            {
+                PlayerPrefs.SetInt("SharkShipOwned", 0);
+                PlayerPrefs.DeleteKey("Promo_shark");
+                refunded++;
+                if (PlayerPrefs.GetString("SelectedShip", "blue") == "shark")
                     PlayerPrefs.SetString("SelectedShip", "blue");
             }
             if (PlayerPrefs.GetInt("PiratShipOwned", 0) == 1)

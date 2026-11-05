@@ -9,7 +9,7 @@ using UnityEngine.UI;
 // runtime on first use because its tiles are generated per spin anyway.
 public class LootBox : MonoBehaviour
 {
-    public enum DropKind { Coins, YellowShip, PiratShip }
+    public enum DropKind { Coins, YellowShip, PiratShip, SharkShip }
 
     public class Drop
     {
@@ -24,7 +24,7 @@ public class LootBox : MonoBehaviour
 
     public const int Price = 65;
 
-    // Free boxes (granted by the "100box" promo code) are spent before coins.
+    // Free boxes (granted by the "10box" promo code) are spent before coins.
     public const string FreeBoxesKey = "FreeBoxes";
     public static int  FreeBoxes => PlayerPrefs.GetInt(FreeBoxesKey, 0);
     public static void AddFreeBoxes(int amount)
@@ -37,6 +37,7 @@ public class LootBox : MonoBehaviour
     // Ships already owned are refunded at their sell price instead.
     public const int YellowDuplicateCoins = 75;
     public const int PiratDuplicateCoins  = 100;
+    public const int SharkDuplicateCoins  = 1000; // promo-only ship has no sell price; a duplicate is never worse than the 1000-coin drop
 
     static readonly Color Common    = new Color(0.62f, 0.66f, 0.72f);
     static readonly Color Uncommon  = new Color(0.29f, 0.62f, 1.00f);
@@ -45,17 +46,19 @@ public class LootBox : MonoBehaviour
     static readonly Color Mythic    = new Color(0.95f, 0.30f, 0.75f);
     static readonly Color Legendary = new Color(1.00f, 0.75f, 0.15f);
     static readonly Color Arcana    = new Color(1.00f, 0.22f, 0.18f);
+    static readonly Color Immortal  = new Color(0.10f, 0.95f, 0.85f);
 
     // Chances must sum to 100.
     public static readonly Drop[] Drops =
     {
-        new Drop("15 COINS",    DropKind.Coins,      15,   49.5f, Common),
+        new Drop("10 COINS",    DropKind.Coins,      10,   49.5f, Common),
         new Drop("50 COINS",    DropKind.Coins,      50,   16.5f, Uncommon),
-        new Drop("100 COINS",   DropKind.Coins,      100,  12.5f, Rare),
-        new Drop("YELLOW SHIP", DropKind.YellowShip, 0,    11.5f, Epic),
+        new Drop("100 COINS",   DropKind.Coins,      100,  12f,   Rare),
+        new Drop("YELLOW SHIP", DropKind.YellowShip, 0,    11f,   Epic),
         new Drop("PIRAT SHIP",  DropKind.PiratShip,  0,    5.5f,  Mythic),
         new Drop("250 COINS",   DropKind.Coins,      250,  4f,    Legendary),
-        new Drop("1000 COINS",  DropKind.Coins,      1000, 0.5f,  Arcana),
+        new Drop("1000 COINS",  DropKind.Coins,      1000, 1f,    Arcana),
+        new Drop("SHARK SHIP",  DropKind.SharkShip,  0,    0.5f,  Immortal),
     };
 
     [Header("Wired by GameSetup")]
@@ -147,6 +150,11 @@ public class LootBox : MonoBehaviour
                 PlayerPrefs.SetInt("PiratShipOwned", 1);
                 PlayerPrefs.Save();
                 return "PIRAT SHIP!";
+            case DropKind.SharkShip:
+                if (PlayerPrefs.GetInt("SharkShipOwned", 0) == 1) { coinsGranted = SharkDuplicateCoins; break; }
+                PlayerPrefs.SetInt("SharkShipOwned", 1);
+                PlayerPrefs.Save();
+                return "SHARK SHIP!";
             default:
                 coinsGranted = drop.coins;
                 CoinManager.Instance.AddCoins(coinsGranted, false);
@@ -347,6 +355,14 @@ public class LootBox : MonoBehaviour
             case DropKind.PiratShip:
                 ShipIcon(go.transform, new Color(0.45f, 0.30f, 0.15f), new Color(0.30f, 0.20f, 0.10f), true);
                 break;
+            case DropKind.SharkShip:
+            {
+                ShipIcon(go.transform, ModernShipVisual.MetalColor, new Color(0.68f, 0.71f, 0.74f), false);
+                var pic = NewUI("Shark", go.transform, new Vector2(0.14f, 0.40f), new Vector2(0.86f, 0.54f)).AddComponent<RawImage>();
+                pic.texture       = ModernShipVisual.SharkTexture;
+                pic.raycastTarget = false;
+                break;
+            }
         }
 
         NewText("Name", go.transform, drop.name, 22, Color.white, new Vector2(0f, 0.10f), new Vector2(1f, 0.30f))

@@ -77,8 +77,10 @@ public class PlayerShip : MonoBehaviour
         bool yellowRed  = selected == "yellowred";
         bool pirat      = selected == "pirat";
         bool white      = selected == "white";
+        bool shark      = selected == "shark";
 
-        ShipStats stats = pirat     ? ShipData.Pirate
+        ShipStats stats = shark     ? ShipData.Shark
+                        : pirat     ? ShipData.Pirate
                         : white     ? ShipData.White
                         : yellowRed ? ShipData.YellowRed
                         : yellow    ? ShipData.Yellow
@@ -90,7 +92,11 @@ public class PlayerShip : MonoBehaviour
         fireInterval  = stats.fireDelay;
         torpedoDamage = stats.torpedoDamage;
 
-        if (pirat)
+        if (shark)
+        {
+            ApplySharkShipVisual();
+        }
+        else if (pirat)
         {
             ApplyPiratShipVisual();
         }
@@ -110,6 +116,18 @@ public class PlayerShip : MonoBehaviour
             if (cabin != null) cabin.material.SetColor("_BaseColor", cabinColor);
         }
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
+    }
+
+    // Modern grey warship with a shark picture, generated in code (ModernShipVisual). The box hull/cabin
+    // renderers are hidden but the Hull BoxCollider stays active for torpedo hits.
+    void ApplySharkShipVisual()
+    {
+        var hull  = transform.Find("Hull")?.GetComponent<MeshRenderer>();
+        var cabin = transform.Find("Cabin")?.GetComponent<MeshRenderer>();
+        Material template = hull != null ? hull.sharedMaterial : null;
+        if (hull  != null) hull.enabled  = false;
+        if (cabin != null) cabin.enabled = false;
+        ModernShipVisual.Build(transform, template);
     }
 
     void ApplyPiratShipVisual()

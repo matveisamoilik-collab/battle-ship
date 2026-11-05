@@ -18,10 +18,11 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"YellowRedShipOwned"` | int | 0 | 1 = yellow-red ship unlocked via `pizza1` |
 | `"WhiteShipOwned"` | int | 0 | 1 = white ship unlocked via `godship` |
 | `"PiratShipOwned"` | int | 0 | 1 = pirate ship purchased |
-| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, `"yellowred"`, `"pirat"`, or `"white"` |
+| `"SharkShipOwned"` | int | 0 | 1 = shark ship won from the loot box (0.5 % drop — the only way to get it) |
+| `"SelectedShip"` | string | `"blue"` | Active ship: `"blue"`, `"yellow"`, `"yellowred"`, `"pirat"`, `"white"`, or `"shark"` |
 | `"Promo_pizza1"` … `"Promo_pizza8"`, `"Promo_godship"`, `"Promo_shchuka"` | int | 0 | 1 = promo code already redeemed (`щука` uses the ASCII key `Promo_shchuka`) |
-| `"FreeBoxes"` | int | 0 | Free loot boxes left (granted by `100box`; spent before coins) |
-| `"Promo_100box"` | int | 0 | 1 = `100box` already redeemed |
+| `"FreeBoxes"` | int | 0 | Free loot boxes left (granted by `10box`; spent before coins) |
+| `"Promo_10box"` | int | 0 | 1 = `10box` already redeemed |
 | `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–5 (`GameManager.MaxLevel = 5`) |
 
 ## Development Workflow
@@ -70,22 +71,22 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 
 - **`pizza1` special case**: also sets `"YellowRedShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
 - **`godship` special case**: also sets `"WhiteShipOwned" = 1` and shows "+5 COINS + SHIP!" feedback.
-- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts each code's `RewardFor(code)` coins and clears the PlayerPrefs flag for each redeemed code; if `pizza1` was reset, also clears `"YellowRedShipOwned"`; if `godship` was reset, also clears `"WhiteShipOwned"`; also resets `"PiratShipOwned"` and deducts 200 coins if owned. Reverts `"SelectedShip"` to `"blue"` if any reset ship was selected. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
-- **`100box` special code**: not in `s_validPromoCodes` (gives no coins); handled in `OnRedeemPromoCode()` before the valid-code check. One-time (`"Promo_100box"`): grants 100 free loot boxes via `LootBox.AddFreeBoxes(100)`. `resett` clears its flag and sets `"FreeBoxes"` to 0.
+- **`resett` special code**: not in `s_validPromoCodes`; handled first in `OnRedeemPromoCode()`. Iterates `s_validPromoCodes`, subtracts each code's `RewardFor(code)` coins and clears the PlayerPrefs flag for each redeemed code; if `pizza1` was reset, also clears `"YellowRedShipOwned"`; if `godship` was reset, also clears `"WhiteShipOwned"`; clears `"SharkShipOwned"` if owned (no coin deduction); also resets `"PiratShipOwned"` and deducts 200 coins if owned. Reverts `"SelectedShip"` to `"blue"` if any reset ship was selected. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
+- **`10box` special code**: not in `s_validPromoCodes` (gives no coins); handled in `OnRedeemPromoCode()` before the valid-code check. One-time (`"Promo_10box"`): grants 10 free loot boxes via `LootBox.AddFreeBoxes(10)`. `resett` clears its flag and sets `"FreeBoxes"` to 0.
 - **`resetl` special code**: not in `s_validPromoCodes`; handled in `OnRedeemPromoCode()` before the valid-code check. Sets `"CurrentLevel"` to 1 and immediately updates `MainMenu.levelText` to "LEVEL: 1" so the top-right HUD reflects the reset without a scene reload. Shows cyan feedback. Can be used any number of times (not stored in PlayerPrefs).
 - **Future-proofing**: add new codes to `s_validPromoCodes` and `resett` covers them automatically. If a new code unlocks a ship, add the ship-revocation logic to the `pizza1WasReset`-style check in the `resett` block.
 
 **Loot Box tab** (`LootBox.cs`, component on the `ShopPanel` root; tab content built by `GameSetup.BuildLootBoxContent()`):
 - "SEA CHEST" card (chest drawn from Images) with price + OPEN button on the left, POSSIBLE DROPS table on the right. The table rows are generated from `LootBox.Drops`, so the displayed odds always match the real ones.
 - Costs `LootBox.Price` = **65 coins**, unlimited purchases. **Free boxes** (`LootBox.FreeBoxes`, PlayerPrefs `"FreeBoxes"`) are spent first — OPEN / OPEN AGAIN then read "(FREE)". A small red **"BOXES: N"** badge sits in the top-right of the chest card (built at runtime by `LootBox.EnsureCounter()`, updated in `RefreshButton()`). OPEN is disabled when there are no free boxes and coins < 65 (`LootBox.RefreshButton()`, also called from `RefreshShopUI()`).
-- Drop table (`LootBox.Drops`, chances sum to 100): 15 coins 49.5 % (gray) · 50 coins 16.5 % (light blue) · 100 coins 12.5 % (blue) · yellow ship 11.5 % (purple) · pirate ship 5.5 % (pink) · 250 coins 4 % (gold) · 1000 coins 0.5 % (red).
-- Already-owned ship drops are refunded at sell price instead: yellow → 75 coins, pirate → 100 coins.
+- Drop table (`LootBox.Drops`, chances sum to 100): 10 coins 49.5 % (gray) · 50 coins 16.5 % (light blue) · 100 coins 12 % (blue) · yellow ship 11 % (purple) · pirate ship 5.5 % (pink) · 250 coins 4 % (gold) · 1000 coins 1 % (red) · shark ship 0.5 % (teal, tile shows a metal ship icon with the shark picture).
+- Already-owned ship drops are refunded at sell price instead: yellow → 75 coins, pirate → 100 coins, shark → 1000 coins (`SharkDuplicateCoins`; promo-only ship has no sell price).
 - The reward is rolled and saved **immediately** when OPEN is pressed (quitting mid-animation never loses it); the coin counter is held back until the reveal. `CoinManager.AddCoins(amount, playSound: false)` is used for the silent grant.
 - **Opening animation** (case-roulette style): a full-shop overlay built at runtime (`LootBox.EnsureOverlay()`) with a masked horizontal strip of 60 reward tiles (rarity-tinted, rarity bar at the bottom, coin diamond or mini ship icon). The rolled reward sits at tile 50; the strip scrolls with a quartic ease-out over 6.5 s (unscaled time) and stops at a random point inside the winning tile under a gold centre marker. A tick (`click`, pitch 1.35) plays each time a tile passes the marker. Reveal: winning tile pulses, "YOU GOT: …" in the rarity colour, `victory` sound for ships / ≤10 % drops, otherwise `coins`. Then OK (close) and OPEN AGAIN (65) buttons appear.
 
 **Ship card pattern in Bought tab:**
 - Standard (purchasable) ships — blue, yellow: ColorSwatch `(0.05,0.45)–(0.95,0.92)`, ShipNameText `(0,0.30)–(1,0.43)`, bottom strip `(0.04–0.26)`: SELECT (left, 0.05–0.52) + SELL (right, 0.55–0.95, red tint), replaced by "✓ SELECTED" label when selected.
-- Promo-only ships — yellow-red, white: same swatch/name layout but **no SELL button**; SELECT spans full width `(0.05–0.95)`. Yellow-red swatch uses two nested `Image` children (bottom half yellow, top half red). White swatch is a single solid `Color.white` image on a dark gray `(0.15, 0.15, 0.15)` card background.
+- Non-sellable ships — yellow-red, white (promo), shark (loot box only): same swatch/name layout but **no SELL button**; SELECT spans full width `(0.05–0.95)`. Yellow-red swatch uses two nested `Image` children (bottom half yellow, top half red). White swatch is a single solid `Color.white` image on a dark gray `(0.15, 0.15, 0.15)` card background. Shark swatch is a metal-gray `Image` with a child `RawImage` + `SharkSwatch` component that shows the runtime-drawn shark picture (`AspectRatioFitter` set from the texture's aspect, 3.0).
 
 **BoughtContent card grid positions** (anchor coords within BoughtContent):
 | Card | anchorMin | anchorMax |
@@ -95,12 +96,13 @@ The Shop is a modal overlay panel on the MainMenu canvas, built entirely in `Bui
 | YellowRed | (0.02, 0.38) | (0.38, 0.66) |
 | Pirat | (0.42, 0.38) | (0.78, 0.66) |
 | White | (0.02, 0.06) | (0.38, 0.34) |
+| Shark | (0.42, 0.06) | (0.78, 0.34) |
 
 **Adding a new purchasable ship:** add its card to ToBuyContent and BoughtContent in `BuildShopPanel()`, add corresponding `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` key for ownership, add a new `"SelectedShip"` string value, and extend `RefreshShopUI()` and `ApplySelectedShip()` (in `PlayerShip.cs`) to handle the new variant.
 
 **Adding a new promo-only ship:** add its card to BoughtContent only (not ToBuyContent), add `public GameObject`/`public Button` fields to `MainMenu`, add `PlayerPrefs` ownership key, handle in `RefreshShopUI()` and `ApplySelectedShip()`, add the unlock to the relevant promo code's special-case block in `OnRedeemPromoCode()`, and add ship-revocation to the `resett` block (model after the `pizza1WasReset` pattern).
 
-**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()` after the default HP/health-bar setup. It reads `"SelectedShip"` from PlayerPrefs, looks up the matching `ShipStats` from `ShipData`, and sets `moveSpeed`, `maxHP`, `currentHP`, `fireInterval`, and `torpedoDamage` from it, then sets hull/cabin colors and refreshes the health bar. The yellow-red ship uses split colors: yellow hull + red cabin. All ship stats are centrally defined in `Assets/Scripts/ShipData.cs`.
+**Runtime ship appearance** is applied in `PlayerShip.ApplySelectedShip()` — called from `Start()` after the default HP/health-bar setup. It reads `"SelectedShip"` from PlayerPrefs, looks up the matching `ShipStats` from `ShipData`, and sets `moveSpeed`, `maxHP`, `currentHP`, `fireInterval`, and `torpedoDamage` from it, then sets hull/cabin colors and refreshes the health bar. The yellow-red ship uses split colors: yellow hull + red cabin. The **shark ship** (`"shark"`) hides the box hull/cabin renderers (Hull BoxCollider stays for torpedo hits) and calls `ModernShipVisual.Build()`, which generates a modern grey-metal warship entirely in code: custom pointed-bow V-hull mesh, deck, bow gun, VLS + missile canisters, superstructure/bridge, mast with spinning radar (`RadarSpin.cs`), funnel, hangar + CIWS dome, helipad with a **3D shark statue** (`BuildHelipadShark()`: 2.6-unit lofted body with smooth normals and a runtime skin texture — blue back, cyan flanks, white belly, orange stripe, red mouth with teeth, gill slits — plus wedge fins with orange tips, yellow/black sphere eyes, on a stand pole; head to starboard). A procedurally drawn, colourful shark picture (royal-blue → cyan body, white belly with orange stripe, orange fin tips, yellow eye, red mouth, jumping out of cyan waves) (`ModernShipVisual.SharkTexture`, 384×128, shark fills ~85 % of the height, background = hull metal colour so it blends in) is applied as a decal on both hull sides (≈ 5.8 × 1.9 units — the whole straight mid-hull from waterline to deck edge), facing the bow. No model/texture assets — materials are cloned from the hull's material at runtime. All ship stats are centrally defined in `Assets/Scripts/ShipData.cs`.
 
 ### Mobile Controls (Android)
 
@@ -185,19 +187,22 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Ship HP — yellow-red | 8 |
 | Ship HP — pirate | 7 |
 | Ship HP — white (godship) | 1000 |
+| Ship HP — shark | 6 |
 | Ship HP — black (bot L4) | 2 |
 | Ship HP — purple (bot L5 split) | 1 |
 | Torpedo damage — blue / yellow / yellow-red / black | 1 |
-| Torpedo damage — pirate | 1.2 |
+| Torpedo damage — pirate / shark | 1.2 |
 | Torpedo speed | 50 units/s |
 | Torpedo lifetime | 5 s |
 | Player fire cooldown — blue / yellow / yellow-red | 2 s |
 | Player fire cooldown — pirate | 1.5 s |
+| Player fire cooldown — shark | 1.6 s |
 | Bot fire interval | ±20% of ship base delay |
 | Player move speed — blue ship | 20 units/s |
 | Player move speed — yellow ship | 40 units/s (2× blue) |
 | Player move speed — yellow-red ship | 24 units/s (1.2× blue) |
 | Player move speed — pirate ship | 20 units/s (same as blue) |
+| Player move speed — shark ship | 32 units/s |
 | Bot move speed — L1/L2 (red) | 20 units/s |
 | Bot move speed — L3 (pirate) | 20 units/s |
 | Bot move speed — L4 (black) | 15 units/s |

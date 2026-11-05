@@ -2226,6 +2226,56 @@ public static class GameSetup
 
         whiteBoughtGO.SetActive(false);
 
+        // Shark ship card (Bought tab only — unlocked via "shark" promo, no SELL button)
+        var sharkBoughtGO = new GameObject("SharkShipBoughtCard");
+        sharkBoughtGO.transform.SetParent(boughtContentGO.transform, false);
+        sharkBoughtGO.AddComponent<Image>().color = new Color(0.12f, 0.14f, 0.17f, 1f);
+        var sharkBoughtRT = sharkBoughtGO.GetComponent<RectTransform>();
+        sharkBoughtRT.anchorMin = new Vector2(0.42f, 0.06f);
+        sharkBoughtRT.anchorMax = new Vector2(0.78f, 0.34f);
+        sharkBoughtRT.offsetMin = sharkBoughtRT.offsetMax = Vector2.zero;
+
+        // Metal-coloured swatch with the shark picture (texture drawn at runtime by SharkSwatch)
+        var sharkSwatchGO = new GameObject("ColorSwatch");
+        sharkSwatchGO.transform.SetParent(sharkBoughtGO.transform, false);
+        sharkSwatchGO.AddComponent<Image>().color = ModernShipVisual.MetalColor;
+        var sharkSwatchRT = sharkSwatchGO.GetComponent<RectTransform>();
+        sharkSwatchRT.anchorMin = new Vector2(0.05f, 0.45f);
+        sharkSwatchRT.anchorMax = new Vector2(0.95f, 0.92f);
+        sharkSwatchRT.offsetMin = sharkSwatchRT.offsetMax = Vector2.zero;
+
+        var sharkPicGO = new GameObject("SharkPicture");
+        sharkPicGO.transform.SetParent(sharkSwatchGO.transform, false);
+        var sharkPicImg = sharkPicGO.AddComponent<RawImage>();
+        sharkPicImg.raycastTarget = false;
+        sharkPicGO.AddComponent<SharkSwatch>();
+        var sharkPicFit = sharkPicGO.AddComponent<AspectRatioFitter>();
+        sharkPicFit.aspectMode  = AspectRatioFitter.AspectMode.FitInParent;
+        sharkPicFit.aspectRatio = 3f;
+
+        var sharkNameGO = MakeText("ShipNameText", sharkBoughtGO.transform, "SHARK SHIP", 20, Color.white);
+        var sharkNameRT = sharkNameGO.GetComponent<RectTransform>();
+        sharkNameRT.anchorMin = new Vector2(0f, 0.30f);
+        sharkNameRT.anchorMax = new Vector2(1f, 0.43f);
+        sharkNameRT.offsetMin = sharkNameRT.offsetMax = Vector2.zero;
+        sharkNameGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        var sharkSelectBtnGO = MakeButton("SelectButton", sharkBoughtGO.transform, "SELECT");
+        var sharkSelectBtnRT = sharkSelectBtnGO.GetComponent<RectTransform>();
+        sharkSelectBtnRT.anchorMin        = new Vector2(0.05f, 0.04f);
+        sharkSelectBtnRT.anchorMax        = new Vector2(0.95f, 0.26f);
+        sharkSelectBtnRT.sizeDelta        = Vector2.zero;
+        sharkSelectBtnRT.anchoredPosition = Vector2.zero;
+
+        var sharkSelectedLabelGO = MakeText("SelectedLabel", sharkBoughtGO.transform, "✓ SELECTED", 20, Color.green);
+        var sharkSelectedLabelRT = sharkSelectedLabelGO.GetComponent<RectTransform>();
+        sharkSelectedLabelRT.anchorMin = new Vector2(0.05f, 0.04f);
+        sharkSelectedLabelRT.anchorMax = new Vector2(0.95f, 0.26f);
+        sharkSelectedLabelRT.offsetMin = sharkSelectedLabelRT.offsetMax = Vector2.zero;
+        sharkSelectedLabelGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        sharkBoughtGO.SetActive(false);
+
         // Pirate ship card (Bought tab — initially inactive; RefreshShopUI activates on purchase)
         var piratBoughtGO = new GameObject("PiratShipBoughtCard");
         piratBoughtGO.transform.SetParent(boughtContentGO.transform, false);
@@ -2289,7 +2339,7 @@ public static class GameSetup
         statsContentRT.offsetMin = Vector2.zero;
         statsContentRT.offsetMax = Vector2.zero;
 
-        // Table helper: each row occupies 1/6 of the height (header + 5 data rows)
+        // Table: header row + 6 data rows
         // Row bands from top: header=0.84–1.0, then rows spaced 0.155 apart downward
         string[] colHeaders = { "SHIP",       "SIZE",  "HP", "SPD", "DMG",  "DELAY" };
         float[]  colMins    = {  0.00f,         0.30f,  0.45f, 0.57f, 0.70f, 0.83f  };
@@ -2315,12 +2365,13 @@ public static class GameSetup
             cellGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
         }
 
-        // Data rows: Blue, Yellow, YellowRed, Pirate, Black(bot)
+        // Data rows: Blue, Yellow, YellowRed, Pirate, Shark, Black(bot)
         string[][] rows = {
             new[] { "BLUE",        "1.00", "7", "20", "1.0", "2.0s" },
             new[] { "YELLOW",      "1.00", "7", "40", "1.0", "2.0s" },
             new[] { "YELLOW-RED",  "1.00", "8", "24", "1.0", "2.0s" },
             new[] { "PIRATE",      "1.00", "7", "20", "1.2", "1.5s" },
+            new[] { "SHARK",       "1.00", "6", "32", "1.2", "1.6s" },
             new[] { "BLACK (BOT)", "0.66", "2", "15", "1.0", "2.5s" },
         };
         Color[] rowBgColors = {
@@ -2328,9 +2379,10 @@ public static class GameSetup
             new Color(0.20f, 0.18f, 0.04f, 0.85f),
             new Color(0.18f, 0.04f, 0.04f, 0.85f),
             new Color(0.12f, 0.08f, 0.04f, 0.85f),
+            new Color(0.14f, 0.17f, 0.20f, 0.85f),
             new Color(0.08f, 0.08f, 0.08f, 0.85f),
         };
-        float rowHeight = 0.155f;
+        float rowHeight = 0.138f; // 6 data rows fit under the header (0.84 → 0.012)
         float rowTop    = 0.84f;
 
         for (int r = 0; r < rows.Length; r++)
@@ -2394,6 +2446,9 @@ public static class GameSetup
         script.whiteShipBoughtCard        = whiteBoughtGO;
         script.whiteShipSelectButton      = whiteSelectBtnGO.GetComponent<Button>();
         script.whiteShipSelectedLabel     = whiteSelectedLabelGO.GetComponent<Text>();
+        script.sharkShipBoughtCard        = sharkBoughtGO;
+        script.sharkShipSelectButton      = sharkSelectBtnGO.GetComponent<Button>();
+        script.sharkShipSelectedLabel     = sharkSelectedLabelGO.GetComponent<Text>();
         script.piratShipToBuyCard         = piratToBuyGO;
         script.piratShipBoughtCard        = piratBoughtGO;
         script.buyPiratShipButton         = piratBuyBtnGO.GetComponent<Button>();
@@ -2441,6 +2496,9 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(
             whiteSelectBtnGO.GetComponent<Button>().onClick,
             script.OnSelectWhiteShip);
+        UnityEventTools.AddPersistentListener(
+            sharkSelectBtnGO.GetComponent<Button>().onClick,
+            script.OnSelectSharkShip);
         UnityEventTools.AddPersistentListener(
             piratBuyBtnGO.GetComponent<Button>().onClick,
             script.OnBuyPiratShipClicked);
