@@ -30,6 +30,17 @@ public class Torpedo : MonoBehaviour
     {
         if (!collisionEnabled) return;
 
+        // Level 6 pillars: only player torpedoes damage them; any torpedo explodes on them
+        CastlePillar pillar = collision.collider.GetComponentInParent<CastlePillar>();
+        if (pillar != null)
+        {
+            if (isPlayerTorpedo) pillar.TakeHit();
+            SoundManager.PlayAt("hit_island", transform.position, 0.8f);
+            SpawnExplosion();
+            Destroy(gameObject);
+            return;
+        }
+
         // Reach the ship script on the root GO — ships are multi-object hierarchies
         Transform root = collision.transform.root;
 

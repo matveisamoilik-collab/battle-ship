@@ -310,6 +310,8 @@ public class PlayerShip : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
+        // Level 6: the island is already sinking — the level is won, nothing can hurt the player
+        if (GameManager.Instance != null && GameManager.Instance.Level6Finale) return;
         currentHP -= amount;
         currentHP = Mathf.Max(0f, currentHP);
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);

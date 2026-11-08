@@ -23,7 +23,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"Promo_pizza1"` … `"Promo_pizza8"`, `"Promo_godship"`, `"Promo_shchuka"` | int | 0 | 1 = promo code already redeemed (`щука` uses the ASCII key `Promo_shchuka`) |
 | `"FreeBoxes"` | int | 0 | Free loot boxes left (granted by `10box`; spent before coins) |
 | `"Promo_10box"` | int | 0 | 1 = `10box` already redeemed |
-| `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–5 (`GameManager.MaxLevel = 5`) |
+| `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–6 (`GameManager.MaxLevel = 6`) |
 
 ## Development Workflow
 
@@ -32,6 +32,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 - Attach the VS Code debugger to a running Unity Editor instance using the "Attach to Unity" launch config (`.vscode/launch.json`)
 - Unity Test Framework (com.unity.test-framework 1.6.0) is available for writing Play Mode and Edit Mode tests via the Unity Test Runner window
 - **Rebuild scenes from scratch**: run `ShipButtlr > Build All` from the Unity menu bar — this executes `Assets/Scripts/Editor/GameSetup.cs`, which programmatically creates all materials, prefabs, and both scenes. Script-only changes (no scene/material changes) are picked up by Unity automatically without a rebuild.
+- **Regenerate the Level 6 models**: `"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe" -b --factory-startup --python 3d/level6/build_dreadhold.py` (Blender 4.5 installed). Writes `3d/level6/Dreadhold*.fbx` + `dreadhold.blend` and fails if any FBX is ≥ 2 MB; then run Build All to import them.
 
 ### Unity Editor & Batch-Mode Integration
 
@@ -58,7 +59,7 @@ Start-Process $unity -Wait -ArgumentList "-batchmode -quit -projectPath `"$proj`
 
 Notes:
 - Exit code: 0 = success, 2 = tests failed, 3 = run/compile error. Always read the log file and the test-results XML. The exit code alone is not enough.
-- `-executeMethod` needs a **static** method on a class in an `Editor` folder. `GameSetup.BuildAll` is `static` (private). If Unity reports it can't find the method, make it `public static`. Omit `-nographics` for Build All because it creates materials, and rendering may be needed.
+- `-executeMethod` needs a **static** method on a class in an `Editor` folder. `GameSetup.BuildAll` is `public static`. Omit `-nographics` for Build All because it creates materials, and rendering may be needed.
 - PlayMode tests in batch mode run real scenes. Gameplay that needs input can be tested by calling public methods directly (e.g. `TakeDamage()`, `GameManager.BotDefeated()`), not by simulating keys.
 - **No tests exist yet.** To add them, create `Assets/Tests/EditMode/` and/or `Assets/Tests/PlayMode/`, each with an `.asmdef` that references `UnityEngine.TestRunner`, `UnityEditor.TestRunner` (EditMode only) and `nunit.framework.dll`. Game scripts live in the default `Assembly-CSharp`, which an asmdef **cannot reference**, so the scripts would first need their own asmdef (e.g. `Assets/Scripts/ShipButtlr.asmdef` referencing `Unity.InputSystem` and `UnityEngine.UI`, with the `Editor` folder getting a separate editor-only asmdef).
 - PlayerPrefs written by tests are the editor's real PlayerPrefs (Windows registry). Tests should save and restore keys such as `"Coins"` and `"CurrentLevel"`, or call `PlayerPrefs.DeleteAll()` only when that's acceptable.
@@ -222,6 +223,7 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Ship HP — shark | 6 |
 | Ship HP — black (bot L4) | 2 |
 | Ship HP — purple (bot L5 split) | 1 |
+| Ship HP — gunboat (bot L6) | 3 |
 | Torpedo damage — blue / yellow / yellow-red / black | 1 |
 | Torpedo damage — pirate / shark | 1.2 |
 | Torpedo speed | 50 units/s |
@@ -248,6 +250,11 @@ Bot fires every 1.6–2.4 s (randomised), with a 2 s initial delay. Torpedoes ar
 | Pirate ship sell price | 100 coins (half price) |
 | Promo code reward | 5 coins (`щука`: 250 coins) |
 | Loot box price | 65 coins (unlimited) |
+| L6 pillar HP | 5 player-torpedo hits each (3 pillars) |
+| L6 cannon damage | 1 per cannonball hit (lands within the hull footprint ±3 × ±6.5) |
+| L6 bomb damage (after 2 pillars down) | 2, area radius 7.93 around the impact |
+| L6 cannon fire interval | 5 s (±15 %) per cannon, range 10–110, full 360° traverse |
+| Bot move speed / fire delay — L6 gunboat | 18 units/s / 2.2 s base (±20%) |
 
 ### Arena & Environment
 - **Sea plane**: 2000×2000 units (scale 200), covers the full visible horizon
@@ -265,15 +272,23 @@ Both ships move via direct `transform.position +=` — Unity physics does not ru
 
 ### Levels System
 
-Five levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key (highest unlocked level — never decreases).
+Six levels share a single GameScene. Level state persists via `"CurrentLevel"` PlayerPrefs key (highest unlocked level — never decreases).
 
 - **Level 1** — open water, red bot ship: all 6 islands are parented under `IslandsRoot`. `GameManager.Awake()` calls `islandsRoot.SetActive(false)` when `playingLevel == 1`. Island collision is a no-op.
 - **Level 2** — island map, red bot ship: `IslandsRoot` active; islands behave as before.
 - **Level 3** — Skull Shoals, pirate bot ship: `Islands3Root` active; one skull island + 6 rocks.
 - **Level 4** — Volcano, survival mode: `Islands4Root` active; central Vulcano.fbx island. **Win condition: survive 120 s without dying.** One black ship spawns at game start (the scene's BotShip); an additional black ship spawns every 11 s (up to 5 total). Bots that are destroyed are simply removed — no game over. A countdown timer (`TimerText`, 48pt white bold, top-centre HUD) is shown; the bot HP bar is hidden. When the timer hits 0, all remaining bots are destroyed and `TriggerVictory()` is called. **Volcano eruption**: the volcano island has a `VolcanoEruption` component that launches a `VolcanoStone` projectile every 5 s, aimed at the player's current XZ position. Stones arc up from the volcano top `(0.5, 13.5, 1.4)` with `VertSpeed=22`, `Gravity=14`; time-of-flight is solved analytically so the stone lands on target. On impact the stone spawns a `SplashEffect` (blue-white burst particles), shakes the camera, and deals **3 damage** to the player if within 8 units. Prefabs: `Assets/Prefabs/VolcanoStone.prefab`, `Assets/Prefabs/SplashEffect.prefab` (created by Build All). Scripts: `VolcanoStone.cs`, `VolcanoEruption.cs`. **Atmosphere**: Level 4 swaps the skybox to `SkyboxMaterial_L4.mat` (gray overcast, no sun disk) and dims the directional light to intensity 0.5 with a cool gray color — applied in `GameManager.Start()`. **Clouds**: 43 cloud objects parented under `Level4_Clouds` (activated only for Level 4 in `GameManager.Awake()`). Clouds are built by `GameSetup.CreateCloud()` from 4 overlapping sphere primitives (no colliders). Each cloud has a `CloudDrifter` component that orbits the volcano center at a fixed linear speed of 10.5 units/s (angular speed = linearSpeed / radius × Rad2Deg, so all clouds move at the same perceived pace). Cloud color is lerped per-cloud from dark gray `(0.50, 0.50, 0.53)` at radius 0 to light gray `(0.90, 0.90, 0.92)` at radius 150, using inline `new Material()` (not saved as asset files). One special central cloud sits stationary at `(0, 22, 0)` directly above the volcano mouth, is 1.3× normal size, and slowly self-rotates at 6°/s around its Y axis (`CloudDrifter.selfRotateSpeed`). 14 inner clouds orbit at 15–50 units radius; 28 outer clouds orbit at 50–150 units radius; all go the same direction. **Lightning strike**: the volcano island also has a `LightningStrike` component. Every 15 s it snapshots the player's XZ position and spawns a `LightningMarker` prefab there — a flat transparent red disc (radius 12 units, `Assets/Prefabs/LightningMarker.prefab`) just above the water surface. After 1.99 s, the marker is destroyed and 3 `LightningBolt` instances are spawned from the central cloud base `(0, 17, 0)` down to the strike centre (bolts 2 and 3 have ±2-unit XZ jitter). Each bolt is a `LineRenderer` with 8 segments zigzagging between endpoints; it flashes 7 times (0.12 s on / 0.23 s off ≈ 2.45 s total) using `WaitForSecondsRealtime` then self-destructs. A ground-level white particle burst (`LightningEffect.prefab`) also fires at the strike point. Camera shakes `(0.4 s, 0.35)`. **Damage per flash**: the main bolt (bolt 1 only, so 1 hit per flash, not 3) checks on every flash whether the player is within 12 units of the strike centre and deals 1 damage each time — even though the red marker is already gone. Up to 7 damage per strike if the player stays inside. Logic lives in `LightningBolt.SetDamage()` / `TryDamagePlayer()`; skipped when `GameManager.IsGameOver`. The lightning bolt material is saved as `Assets/Materials/LightningBoltMaterial.mat` (URP/Lit, white + emission) — **must be a saved asset** or it will appear pink. Scripts: `LightningStrike.cs`, `LightningBolt.cs`. Prefabs: `LightningMarker.prefab`, `LightningBolt.prefab`, `LightningEffect.prefab`.
 - **Level 5** — Anchor Bay, red bot ship (L1/L2 stats); when the red ship sinks it splits into **2 purple ships** at the same spot — win after both are sunk: `Islands5Root` (`Level5_AnchorBay`) active. Two islands in the middle, built by `GameSetup.BuildAnchorBay()` from `Assets/Models/AnchorBay/` (copied from `3d/anchor/` by Build All): **AnchorIsland1** (right, +X as seen from player spawn) uses `targetRadius = 33.6` like L3/L4 (footprint 53.76, collision radius 26.88); **AnchorIsland2** (left, −X) is 3× smaller across (`targetRadius = 11.2`, radius 8.96). Edge-to-edge gap = 24 units (2 ship lengths); the pair is centred on x = 0 → centres ≈ (+20.96, 0, 0) and (−38.88, 0, 0). **Anchor hazard** (`AnchorHook.cs`, on AnchorIsland1): `AnchorModel.fbx` (largest dimension = 53.76 / 5 ≈ 10.75) rests on the island's −Z side (Y found by an editor-time raycast against temporary MeshColliders in `GameSetup.SurfaceHeight()`). After 10 s idle it homes onto the player at 60 u/s (chain `LineRenderer`, saved `AnchorChainMaterial.mat`), hooks the ship and calls `PlayerShip.BeginPull(island centre, 30)` — player input is ignored (firing still works) and the ship is dragged toward the island. When `PlayerShip.PushOutOfIslands()` resolves contact with **any** island (`PullCrashed`) or after a 6 s timeout, it calls `EndPull()`, shakes the camera, and reels back at 45 u/s; the 10 s idle timer restarts once it is back. The anchor deals no damage itself — the crash is charged by the island-collision rule below.
+- **Level 6** — Dreadhold, castle island on three pillars (no regular bot ship): `Islands6Root` (`Level6_Dreadhold`) active, built by `GameSetup.BuildDreadhold()` from the Blender models in `Assets/Models/Dreadhold/` (generated by `3d/level6/build_dreadhold.py`, copied by Build All; imported with `bakeAxisConversion = true`, so no runtime rotation/scaling; FBX material slots `L6_*` are remapped to saved URP materials of the same name by `RemapL6Materials()`). Layout constants (`L6*` in GameSetup) must match the Python script.
+  - **Island** at the origin: rocky mass at sea level (r≈23 at the waterline) flaring to an overhanging rim (r≈26, y≈6.6) with a grassy top and a flat plateau (y 10, r 16). `IslandData.radius = 24`; torpedo `CapsuleCollider` r 22.5 (height 80, so it's full-radius at torpedo height and stays inside the pillar ring). Rock + castle + cannons live under a `Visual` child (`CastleIsland.sinkRoot`).
+  - **Pillars** (`CastlePillar.cs`): 3 at r 26.5, angles 180° / 60° / 300° (the first faces the player spawn), standing in the water under rock corbel lips. Highlighted by pulsing emissive rune bands (one per drum — they double as the HP read-out), a glowing ring on the water and a bobbing arrow `Marker` at y 11. Collider: capsule r 2.2 (y −1.5…7); own `IslandData` r 2.5 (counts for the L5+ crash rule). **5 player-torpedo hits** each (`Torpedo` checks `GetComponentInParent<CastlePillar>()` before the tag logic; bot torpedoes just explode): hits 1–4 swap drum *n* (bottom → top) for its cracked `_Damaged` mesh, darken its rune (`L6_RuneDead`), throw `Chunk` debris (`FallingPiece.cs`, scripted gravity, no Rigidbody) and tilt the pillar 1.5° outward; hit 5 disables the collider/IslandData and topples every drum + capital outward into the sea (splashes, sink, self-destruct).
+  - **Each collapse** (`CastleIsland.OnPillarCollapsed`): the island sags 2° toward the lost support and **one enemy gunboat** spawns 12 units outward (`GameManager.SpawnLevel6Boat` → `botShipPrefab` with `BotShip.spawnAsBoat = true`: `ShipData.Boat`, 2/3 scale like the black ship, `DreadholdBoat.fbx` visual via `BotShip.AttachModel()`, turned 180° about Y by `BotShip.BoatYawFix` because the FBX imports bow −Z, no HUD bar; destroyed boats are just removed). The scene `BotShip` is destroyed in `GameManager.Awake()` and the bot HP bar hidden.
+  - **Cannons** (`CastleCannon.cs`): 6 total, one on top of each **edge tower** of the hexagonal outer wall (r 13.5, top y 10 + 6.3, angles 0°, 60° … 300°); none on the wall segments or the keep. The cannon pivots are children of `Visual`, **not** of `CastleModel` — the castle FBX root carries the ≈ 90° X axis-fix rotation, so positions given in its local space land off the towers. Build All raycasts each spot against the castle mesh (`SurfaceHeight()`), seats the cannon on the hit and logs `Orientation FAIL — Cannon_i on edge-tower top` if it is not at the expected tower top. Each cannon traverses the full **360°** (no blind zones, 90°/s); when the player is 10–110 units away it pitches the barrel to the launch angle and fires every 5 s (±15 %, staggered start) once aimed within 3°. Each shot spawns the muzzle flash (`ExplosionEffect`) plus **grey smoke** (`Assets/Prefabs/CannonSmoke.prefab`, built by `GameSetup.CreateCannonSmokePrefab()`, saved `CannonSmokeMaterial.mat` + `SmokePuffTexture.asset`) blown out along the barrel. `Cannonball.cs` (prefab `Assets/Prefabs/Cannonball.prefab`, sphere, no collider) flies ballistically (g 14, flight time `clamp(dist/35, 1.2, 3)` s, aimed at the player plus 50 % lead) and deals **1 damage** if it lands within the player hull footprint, otherwise splashes. **Bomb mode**: once **2 pillars** are destroyed (`CastleIsland.BombMode`, `BombsAfterPillars = 2`), every cannon shot is a bomb (`Cannonball.Launch(vel, bomb: true, target)`): 1.7× bigger, glowing red `L6_Bomb` material, a red warning disc (the `LightningMarker` prefab scaled to radius 7.93) on the landing spot during flight, and a big explosion on impact. Area damage: **2 HP** if the player ship's centre is within `Cannonball.BombRadius` = **7.93 units** (half the 12-unit lightning radius, then +15.5 %, +6.3 %, +7.1 %, +0.5 %) or the bomb lands on the hull.
+  - **Finale**: when the third pillar falls, `GameManager.BeginLevel6Finale()` removes boats, cannonballs and bot torpedoes, stops the cannons and makes the player invulnerable (`PlayerShip.TakeDamage` returns while `Level6Finale`). The island shakes for 2 s, then sinks 45 units over 6 s (tipping, rim splashes, camera shakes), then `Level6Cleared()` → `TriggerVictory()`.
+  - **HUD**: `ObjectiveText` ("PILLARS LEFT: N", 40 pt white bold with outline, top-centre — same slot as the L4 timer) shown only on L6 via `GameManager.SetObjective()`.
+  - Model sizes: every `Dreadhold*.fbx` is < 100 KB (limit 2 MB, enforced by the script).
 - **Island collision damage (Level 5+)**: from `PlayingLevel >= 5`, every new player-ship collision with any island costs **1 HP** (`PlayerShip.PushOutOfIslands()`, constants `IslandCrashDamageFromLevel` / `IslandCrashDamage`). Counted once per contact (edge-triggered via `wasTouchingIsland`, with a 0.5-unit `IslandTouchMargin` hysteresis) — scraping along the coast does not drain HP every frame. Applies to manual collisions and anchor-pull crashes alike; bots are unaffected.
-- **Progression**: `TriggerVictory()` (and `BotDefeated()` for levels 1-3) advances `"CurrentLevel"` by 1, capped at `GameManager.MaxLevel` (5). Loss never changes the level.
+- **Progression**: `TriggerVictory()` (and `BotDefeated()` for levels 1-3) advances `"CurrentLevel"` by 1, capped at `GameManager.MaxLevel` (6). Loss never changes the level.
 - **Play Again after win**: advances to `playingLevel + 1` (capped at 5). Play Again after loss replays the same level.
 - **UI**: A `"LEVEL: X"` text (black, 30pt) sits below the coin counter (top-left, anchoredPosition `(20, -75)`) on both the MainMenu canvas (`MainMenu.levelText`) and the GameScene HUD (`GameManager.levelText`). GameManager sets it from `playingLevel` in `Start()`.
 - **Coin text color**: yellow (`Color.yellow`) on both canvases. **Level text color**: black (`Color.black`).
@@ -285,11 +300,11 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 **Map images** live in `Assets/Resources/` (copied from `images/` at project root by `GameSetup.CopyMapImages()` during Build All, imported as Sprites):
 - `Level_1.png` — Coral Cove bright, rest dim. Shown when `CurrentLevel == 1`.
 - `Level_2.png` — Coral Cove + Pirate's Rest bright. Shown when `CurrentLevel >= 2`.
-- `Level_3.png` / `Level_4.png` / `Level_5.png` — shown when `CurrentLevel >= 3 / 4 / 5`.
+- `Level_3.png` / `Level_4.png` / `Level_5.png` / `Level_6.png` — shown when `CurrentLevel >= 3 / 4 / 5 / 6`.
 
 **Runtime flow** (`MainMenu.cs`):
-- `OnMapClicked()` → calls `RefreshMapImage()` (loads correct sprite via `Resources.Load<Sprite>()`) → sets `island2Button`…`island5Button.interactable` based on `CurrentLevel` → shows panel.
-- `OnIsland1Clicked()` … `OnIsland5Clicked()` → sets `MainMenu.levelToPlay = 1…5` → loads GameScene.
+- `OnMapClicked()` → calls `RefreshMapImage()` (loads correct sprite via `Resources.Load<Sprite>()`) → sets `island2Button`…`island6Button.interactable` based on `CurrentLevel` → shows panel.
+- `OnIsland1Clicked()` … `OnIsland6Clicked()` → sets `MainMenu.levelToPlay = 1…6` → loads GameScene.
 - `OnCloseMapClicked()` → hides panel.
 
 **`MainMenu.levelToPlay` static override** (session-only, not persisted):
@@ -314,6 +329,7 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 | Island3 (Skull Shoals) | (0.23, 0.15) | (0.39, 0.31) | bottom-center |
 | Island4 (Storm Isle) | (0.37, 0.38) | (0.60, 0.72) | center — volcano body, NOT the label to its right |
 | Island5 (Anchor Bay) | (0.66, 0.38) | (0.86, 0.56) | right — island body on Level_5.png (1536×1024 px ≈ x 1010–1330, y 450–640) |
+| Island6 (Dreadhold) | (0.58, 0.68) | (0.79, 0.92) | top-right — castle + rock on Level_6.png (≈ x 890–1215, y 80–330 px), label excluded |
 
 **4-button MainMenu layout** (anchor Y bands):
 - PLAY: 0.56–0.65 | MAP: 0.44–0.53 | SHOP: 0.32–0.41 | QUIT: 0.20–0.29
@@ -327,7 +343,7 @@ Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int tr
 - `SoundManager.Play(name, volume, pitchJitter, pitch)` — 2D one-shot from a 12-source pool. `SoundManager.PlayAt(name, worldPos, ...)` — same, volume falls off with distance from `Camera.main` (floor 0.3 at 160 units). Sources ignore `Time.timeScale`, so end-panel jingles play while paused.
 - Looping `ocean_loop` ambience (volume 0.25) plays in every scene.
 - Every `Button` in each loaded scene (including inactive panels) gets a `click` sound automatically via `sceneLoaded`.
-- Hooks: torpedo fire (player/bot) → `torpedo_fire`; torpedo hits ship → `hit_ship`, hits island/wall → `hit_island`; ship sunk → `big_explosion` + `ship_sink`; new island contact → `island_crash`; victory/defeat → `victory` / `defeat`; `CoinManager.AddCoins` → `coins`; volcano launch → `big_explosion` (pitch 0.7), stone impact → `splash`; lightning → `thunder`; anchor throw / hook / reel → `anchor_throw` / `anchor_hook` / `anchor_reel`.
+- Hooks: torpedo fire (player/bot) → `torpedo_fire`; torpedo hits ship → `hit_ship`, hits island/wall → `hit_island`; ship sunk → `big_explosion` + `ship_sink`; new island contact → `island_crash`; victory/defeat → `victory` / `defeat`; `CoinManager.AddCoins` → `coins`; volcano launch → `big_explosion` (pitch 0.7), stone impact → `splash`; lightning → `thunder`; anchor throw / hook / reel → `anchor_throw` / `anchor_hook` / `anchor_reel`; L6 cannon shot → `big_explosion` (pitch 1.4, vol 0.45), cannonball miss → `splash`, hit → `hit_ship`, bomb impact → `big_explosion` (pitch 1.1); pillar hit → `hit_island`, pillar collapse → `big_explosion` (pitch 0.8); island sinking → `big_explosion` (pitch 0.5) + `ship_sink` (pitch 0.6).
 - To add a sound: drop `<name>.ogg` into `Assets/Resources/Sounds/` and call `SoundManager.Play("<name>")`.
 
 ### Rendering

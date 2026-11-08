@@ -23,7 +23,11 @@ public class GameManager : MonoBehaviour
     public GameObject islands3Root;
     public GameObject islands4Root;
     public GameObject islands5Root;
+    public GameObject islands6Root;
     public Text levelText;
+
+    [Header("Level 6")]
+    public Text objectiveText;
 
     [Header("Level 4")]
     public Text       timerText;
@@ -33,7 +37,7 @@ public class GameManager : MonoBehaviour
     public GameObject cloudsRoot;
     public Light      directionalLight;
 
-    public  const int   MaxLevel         = 5;
+    public  const int   MaxLevel         = 6;
     private const float SurvivalDuration = 90f;
     private const float SpawnInterval    = 18f;
 
@@ -46,6 +50,8 @@ public class GameManager : MonoBehaviour
     private float spawnTimer;
     private int   purpleAlive;     // Level 5: purple ships still afloat after the red ship sinks
     private bool  purpleSpawned;   // Level 5: red ship already split into purples
+    private bool  level6Finale;    // Level 6: all pillars down, island sinking
+    public  bool  Level6Finale => level6Finale;
 
     private const int   PurpleSplitCount  = 2;
     private const float PurpleSplitOffset = 4f; // sideways offset from the red ship's wreck
@@ -68,7 +74,18 @@ public class GameManager : MonoBehaviour
         if (islands3Root != null) islands3Root.SetActive(playingLevel == 3);
         if (islands4Root != null) islands4Root.SetActive(playingLevel == 4);
         if (islands5Root != null) islands5Root.SetActive(playingLevel == 5);
+        if (islands6Root != null) islands6Root.SetActive(playingLevel == 6);
         if (cloudsRoot   != null) cloudsRoot.SetActive(playingLevel == 4);
+
+        // Level 6 starts with no enemy ship — only the castle cannons. Boats spawn from pillars.
+        if (playingLevel == 6)
+        {
+            foreach (var bot in FindObjectsByType<BotShip>(FindObjectsSortMode.None))
+            {
+                bot.gameObject.SetActive(false);
+                Destroy(bot.gameObject);
+            }
+        }
     }
 
     void Start()
@@ -102,6 +119,51 @@ public class GameManager : MonoBehaviour
         {
             if (timerText != null) timerText.gameObject.SetActive(false);
         }
+
+        if (playingLevel == 6)
+        {
+            if (botHPGroup != null) botHPGroup.SetActive(false);
+            if (objectiveText != null) objectiveText.gameObject.SetActive(true);
+        }
+        else if (objectiveText != null)
+            objectiveText.gameObject.SetActive(false);
+    }
+
+    // Level 6 HUD: pillars still standing
+    public void SetObjective(int pillarsLeft)
+    {
+        if (objectiveText != null)
+            objectiveText.text = "PILLARS LEFT: " + pillarsLeft;
+    }
+
+    // Level 6: a small enemy gunboat appears where a pillar collapsed
+    public void SpawnLevel6Boat(Vector3 pos, Quaternion rot)
+    {
+        if (botShipPrefab == null || gameOver || level6Finale) return;
+        pos.x = Mathf.Clamp(pos.x, -90f, 90f);
+        pos.z = Mathf.Clamp(pos.z, -90f, 90f);
+        pos.y = 0f;
+        var go = Instantiate(botShipPrefab, pos, rot);
+        var bs = go.GetComponent<BotShip>();
+        if (bs != null) bs.spawnAsBoat = true; // read in BotShip.Start(), which runs next frame
+    }
+
+    // Level 6: last pillar down — clear every threat so the player can watch the island sink
+    public void BeginLevel6Finale()
+    {
+        if (gameOver) return;
+        level6Finale = true;
+        foreach (var bot in FindObjectsByType<BotShip>(FindObjectsSortMode.None))
+            if (bot != null) Destroy(bot.gameObject);
+        foreach (var ball in FindObjectsByType<Cannonball>(FindObjectsSortMode.None))
+            if (ball != null) Destroy(ball.gameObject);
+        foreach (var torpedo in FindObjectsByType<Torpedo>(FindObjectsSortMode.None))
+            if (torpedo != null && !torpedo.isPlayerTorpedo) Destroy(torpedo.gameObject);
+    }
+
+    public void Level6Cleared()
+    {
+        TriggerVictory();
     }
 
     void Update()
@@ -198,9 +260,9 @@ public class GameManager : MonoBehaviour
 
     public void BotDefeated(BotShip bot)
     {
-        if (playingLevel == 4)
+        if (playingLevel == 4 || playingLevel == 6)
         {
-            // In Level 4 bots respawn — just remove the destroyed ship
+            // Level 4 bots respawn and Level 6 is won by sinking the island — just remove the ship
             if (bot != null) Destroy(bot.gameObject);
             return;
         }

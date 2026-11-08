@@ -17,5 +17,6 @@ public static class ShipData
     public static readonly ShipStats Shark     = new ShipStats { speed = 32f, hp = 6f,    torpedoDamage = 1.2f, fireDelay = 1.6f, size = 1f    };
     public static readonly ShipStats Black     = new ShipStats { speed = 15f, hp = 2f,    torpedoDamage = 1f,   fireDelay = 2.5f, size = 0.66f };
     public static readonly ShipStats Red       = new ShipStats { speed = 20f, hp = 7f,    torpedoDamage = 1f,   fireDelay = 1.7f, size = 1f    };
-    public static readonly ShipStats Purple    = new ShipStats { speed = 13f, hp = 1f,    torpedoDamage = 1f,   fireDelay = 2.3f, size = 0.5f  };
+    public static readonly ShipStats Boat      = new ShipStats { speed = 18f, hp = 3f,    torpedoDamage = 1f,   fireDelay = 2.2f, size = 0.66f };
+    public static readonly ShipStats Purple   = new ShipStats { speed = 13f, hp = 1f,    torpedoDamage = 1f,   fireDelay = 2.3f, size = 0.5f  };
 }

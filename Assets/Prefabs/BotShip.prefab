@@ -85,7 +85,9 @@ MonoBehaviour:
   maxHP: 7
   healthBar: {fileID: 0}
   piratShipModel: {fileID: 919132149155446097, guid: 7618980f547526a4f9f3321861df66a9, type: 3}
+  boatModel: {fileID: 919132149155446097, guid: b2fadb1a5bd3dd0439101e14df99d5f1, type: 3}
   spawnAsPurple: 0
+  spawnAsBoat: 0
 --- !u!1 &7996641791232580405
 GameObject:
   m_ObjectHideFlags: 0

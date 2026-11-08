@@ -19,9 +19,15 @@ public class BotShip : MonoBehaviour
     [Header("Level 3 Visual")]
     public GameObject piratShipModel;
 
+    [Header("Level 6 Visual")]
+    public GameObject boatModel;
+
     [Header("Variant")]
     [HideInInspector] public bool spawnAsPurple; // set by GameManager right after Instantiate (Level 5 split)
+    [HideInInspector] public bool spawnAsBoat;   // set by GameManager right after Instantiate (Level 6 pillar)
     public bool IsPurple => spawnAsPurple;
+    public bool IsBoat   => spawnAsBoat;
+    public const float BoatYawFix = 180f;        // DreadholdBoat.fbx imports bow -Z; turn it to face +Z
 
     private const float FiringArc = 10f; // fire only when player is within this bow cone
 
@@ -43,11 +49,14 @@ public class BotShip : MonoBehaviour
     {
         int level    = GameManager.Instance != null ? GameManager.Instance.PlayingLevel : 1;
         bool isPurple = spawnAsPurple;
-        bool isBlack  = !isPurple && level == 4;
-        bool isPirat  = !isPurple && level == 3;
-        bool isRed    = !isPurple && (level == 1 || level == 2 || level == 5);
+        bool isBoat   = !isPurple && spawnAsBoat;
+        bool special  = isPurple || isBoat;
+        bool isBlack  = !special && level == 4;
+        bool isPirat  = !special && level == 3;
+        bool isRed    = !special && (level == 1 || level == 2 || level == 5);
 
         ShipStats stats = isPurple ? ShipData.Purple
+                        : isBoat   ? ShipData.Boat
                         : isBlack  ? ShipData.Black
                         : isPirat  ? ShipData.Pirate
                         : isRed    ? ShipData.Red
@@ -57,12 +66,13 @@ public class BotShip : MonoBehaviour
         torpedoDamage    = stats.torpedoDamage;
         currentFireDelay = stats.fireDelay;
         currentHP        = maxHP;
-        if (isPurple) healthBar = null; // purple ships don't drive the HUD bot HP bar
+        if (special) healthBar = null; // purple ships / L6 boats don't drive the HUD bot HP bar
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);
 
-        // Collision radii depend on hull size (black 2/3 size, purple 1/2 size)
-        shipHullRadius = isPurple ? 3f  : (isBlack ? 4f  : 6f);   // half hull length
-        minPlayerDist  = isPurple ? 13f : (isBlack ? 14f : 18f);  // self + player half-lengths + buffer
+        // Collision radii depend on hull size (black / boat 2/3 size, purple 1/2 size)
+        bool twoThirds = isBlack || isBoat;
+        shipHullRadius = isPurple ? 3f  : (twoThirds ? 4f  : 6f);   // half hull length
+        minPlayerDist  = isPurple ? 13f : (twoThirds ? 14f : 18f);  // self + player half-lengths + buffer
 
         GameObject playerGO = GameObject.FindWithTag("Player");
         if (playerGO != null) player = playerGO.transform;
@@ -70,7 +80,24 @@ public class BotShip : MonoBehaviour
         nextFireTime = Time.time + currentFireDelay;
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
 
-        ApplyBotShipVisual(isBlack, isPirat, isRed, isPurple);
+        if (isBoat) ApplyBoatVisual();
+        else        ApplyBotShipVisual(isBlack, isPirat, isRed, isPurple);
+    }
+
+    void ApplyBoatVisual()
+    {
+        // Same 2/3 footprint as the black ship (hull 8 units), Blender gunboat model on top
+        float s = ShipData.Boat.size;
+        transform.localScale = new Vector3(s, s, s);
+        if (boatModel == null)
+        {
+            ApplyColorShipVisual(new Color(0.35f, 0.12f, 0.10f));
+            return;
+        }
+        // Keep the FBX root's import rotation (axis fix for the single-mesh Blender model), then turn it
+        // 180° about Y: the imported boat's bow points -Z, but BotShip moves along +Z (transform.forward)
+        var rot = Quaternion.Euler(0f, BoatYawFix, 0f) * boatModel.transform.localRotation;
+        AttachModel(boatModel, rot.eulerAngles, "BoatVisual", centerXZ: true);
     }
 
     void ApplyBotShipVisual(bool isBlack, bool isPirat, bool isRed, bool isPurple)
@@ -119,21 +146,28 @@ public class BotShip : MonoBehaviour
     void ApplyPiratShipVisual()
     {
         if (piratShipModel == null) return;
+        // Blender Z-up → Unity Y-up, bow toward +Z
+        AttachModel(piratShipModel, new Vector3(-90f, 270f, 0f), "PiratShipVisual");
+    }
 
-        // Hide original box geometry — keep Hull BoxCollider for torpedo hits
+    // Hides the box hull/cabin (the Hull BoxCollider stays for torpedo hits) and attaches a model
+    // as a child, scaled so its longest XZ axis matches the box hull length (12 local units) and
+    // resting on the hull's base. Measured in this ship's local space, so the ship's own rotation
+    // and scale don't distort the fit.
+    void AttachModel(GameObject prefab, Vector3 localEuler, string modelName, bool centerXZ = false)
+    {
         var hull  = transform.Find("Hull");
         var cabin = transform.Find("Cabin");
         if (hull  != null) { var mr = hull.GetComponent<MeshRenderer>();  if (mr) mr.enabled = false; }
         if (cabin != null) { var mr = cabin.GetComponent<MeshRenderer>(); if (mr) mr.enabled = false; }
 
-        var model = Instantiate(piratShipModel, transform);
-        model.name = "PiratShipVisual";
+        var model = Instantiate(prefab, transform);
+        model.name = modelName;
         model.transform.localPosition    = Vector3.zero;
-        model.transform.localEulerAngles = new Vector3(-90f, 270f, 0f); // Blender Z-up → Unity Y-up, bow toward +Z
+        model.transform.localEulerAngles = localEuler;
         model.transform.localScale       = Vector3.one;
 
-        // Measure world-space AABB
-        Bounds wb = new Bounds();
+        Bounds lb = new Bounds();
         bool hasMesh = false;
         foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
         {
@@ -145,16 +179,18 @@ public class BotShip : MonoBehaviour
             {
                 var wc = mf.transform.TransformPoint(
                     b.center + Vector3.Scale(b.extents, new Vector3(sx, sy, sz)));
-                if (!hasMesh) { wb = new Bounds(wc, Vector3.zero); hasMesh = true; }
-                else wb.Encapsulate(wc);
+                var lc = transform.InverseTransformPoint(wc);
+                if (!hasMesh) { lb = new Bounds(lc, Vector3.zero); hasMesh = true; }
+                else lb.Encapsulate(lc);
             }
         }
 
-        // Scale longest XZ axis to match hull length (12 units)
-        float longest = Mathf.Max(wb.size.x, wb.size.z);
+        float longest = Mathf.Max(lb.size.x, lb.size.z);
         float s = (hasMesh && longest > 0.0001f) ? 12f / longest : 1f;
         model.transform.localScale    = new Vector3(s, s, s);
-        model.transform.localPosition = new Vector3(0f, -wb.min.y * s, 0f);
+        model.transform.localPosition = centerXZ
+            ? new Vector3(-lb.center.x * s, -lb.min.y * s, -lb.center.z * s)
+            : new Vector3(0f, -lb.min.y * s, 0f);
 
         foreach (var col in model.GetComponentsInChildren<Collider>())
             Destroy(col);

@@ -18,7 +18,7 @@ public static class GameSetup
     // -------------------------------------------------------------------------
 
     [MenuItem("ShipButtlr/Build All")]
-    static void BuildAll()
+    public static void BuildAll() // public so batch mode can run it: -executeMethod GameSetup.BuildAll
     {
         EnsureTags();
         CreateFolders();
@@ -33,9 +33,12 @@ public static class GameSetup
         var lightningMarkerPrefab = CreateLightningMarkerPrefab();
         var lightningBoltPrefab   = CreateLightningBoltPrefab();
         var lightningEffectPrefab = CreateLightningEffectPrefab();
+        var cannonballPrefab      = CreateCannonballPrefab(splashPrefab, explosionPrefab, mats["L6_Iron"],
+                                                           mats["L6_Bomb"], lightningMarkerPrefab);
 
         BuildMainMenuScene();
-        BuildGameScene(mats, torpedoPrefab, stonePrefab, lightningMarkerPrefab, lightningBoltPrefab, lightningEffectPrefab);
+        BuildGameScene(mats, torpedoPrefab, stonePrefab, lightningMarkerPrefab, lightningBoltPrefab, lightningEffectPrefab,
+                       explosionPrefab, splashPrefab, cannonballPrefab);
         ConfigureBuildSettings();
 
         AssetDatabase.SaveAssets();
@@ -84,6 +87,7 @@ public static class GameSetup
         EnsureFolder("Assets/Models", "PiratShip");
         EnsureFolder("Assets/Models", "Vulcano");
         EnsureFolder("Assets/Models", "AnchorBay");
+        EnsureFolder("Assets/Models", "Dreadhold");
     }
 
     static void EnsureFolder(string parent, string child)
@@ -113,6 +117,34 @@ public static class GameSetup
         dict["AnchorChain"] = MakeMat("AnchorChainMaterial", new Color(0.22f, 0.22f, 0.24f), smoothness: 0.4f, metallic: 0.6f);
         dict["Cloud"]      = MakeMat("CloudMaterial",      new Color(0.90f, 0.90f, 0.92f));
         dict["CloudDark"]  = MakeMat("CloudDarkMaterial",  new Color(0.50f, 0.50f, 0.53f));
+
+        // Level 6 — Dreadhold. Keys match the Blender material slot names (3d/level6/build_dreadhold.py)
+        dict["L6_Rock"]        = MakeMat("L6_Rock",        new Color(0.36f, 0.33f, 0.30f));
+        dict["L6_Grass"]       = MakeMat("L6_Grass",       new Color(0.33f, 0.50f, 0.18f));
+        dict["L6_CastleStone"] = MakeMat("L6_CastleStone", new Color(0.72f, 0.68f, 0.60f));
+        dict["L6_Roof"]        = MakeMat("L6_Roof",        new Color(0.22f, 0.25f, 0.36f));
+        dict["L6_Window"]      = MakeMat("L6_Window",      new Color(0.06f, 0.05f, 0.05f));
+        dict["L6_Wood"]        = MakeMat("L6_Wood",        new Color(0.40f, 0.25f, 0.12f));
+        dict["L6_PillarStone"] = MakeMat("L6_PillarStone", new Color(0.82f, 0.74f, 0.56f));
+        dict["L6_Iron"]        = MakeMat("L6_Iron",        new Color(0.12f, 0.12f, 0.13f), smoothness: 0.4f, metallic: 0.6f);
+        dict["L6_BoatHull"]    = MakeMat("L6_BoatHull",    new Color(0.35f, 0.12f, 0.10f));
+        dict["L6_BoatDeck"]    = MakeMat("L6_BoatDeck",    new Color(0.55f, 0.40f, 0.22f));
+        dict["L6_Flag"]        = MakeMat("L6_Flag",        new Color(0.08f, 0.08f, 0.08f));
+        dict["L6_RuneDead"]    = MakeMat("L6_RuneDead",    new Color(0.18f, 0.12f, 0.08f));
+        // Glowing pillar rune bands — emissive, saved as an asset (an unsaved one renders pink on device)
+        var rune = MakeMat("L6_Rune", new Color(1.00f, 0.55f, 0.10f));
+        rune.EnableKeyword("_EMISSION");
+        rune.SetColor("_EmissionColor", new Color(1.00f, 0.55f, 0.10f) * 2f);
+        rune.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        EditorUtility.SetDirty(rune);
+        dict["L6_Rune"] = rune;
+        // Level 6 bombs (cannons after 2 pillars fall) — dark red, glowing, saved asset
+        var bomb = MakeMat("L6_Bomb", new Color(0.35f, 0.04f, 0.02f), smoothness: 0.5f, metallic: 0.3f);
+        bomb.EnableKeyword("_EMISSION");
+        bomb.SetColor("_EmissionColor", new Color(1.0f, 0.18f, 0.05f) * 1.5f);
+        bomb.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+        EditorUtility.SetDirty(bomb);
+        dict["L6_Bomb"] = bomb;
         return dict;
     }
 
@@ -417,7 +449,7 @@ public static class GameSetup
         string srcDir = System.IO.Path.Combine(projectRoot, "images");
         string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5", "Level_6" })
         {
             string src = System.IO.Path.Combine(srcDir, lvl + ".png");
             string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
@@ -429,7 +461,7 @@ public static class GameSetup
 
         AssetDatabase.Refresh();
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5", "Level_6" })
         {
             string assetPath = "Assets/Resources/" + lvl + ".png";
             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -457,6 +489,11 @@ public static class GameSetup
         ImportModel(System.IO.Path.Combine(anchorDir, "AnchorIsland1_0.5mb.fbx"), AnchorIsland1Path);
         ImportModel(System.IO.Path.Combine(anchorDir, "AnchorIsland2_0.5mb.fbx"), AnchorIsland2Path);
         ImportModel(System.IO.Path.Combine(anchorDir, "AnchorModel_0.1mb.fbx"),   AnchorModelPath);
+
+        // Level 6 Dreadhold models (generated by 3d/level6/build_dreadhold.py, Unity-axis baked)
+        string l6Dir = System.IO.Path.Combine(projectRoot, "3d", "level6");
+        foreach (string n in DreadholdModels)
+            ImportModel(System.IO.Path.Combine(l6Dir, n + ".fbx"), DreadholdDir + n + ".fbx", bakeAxis: true);
 
         if (!System.IO.File.Exists(src))
         {
@@ -672,7 +709,10 @@ public static class GameSetup
         GameObject stonePrefab,
         GameObject lightningMarkerPrefab,
         GameObject lightningBoltPrefab,
-        GameObject lightningEffectPrefab)
+        GameObject lightningEffectPrefab,
+        GameObject explosionPrefab,
+        GameObject splashPrefab,
+        GameObject cannonballPrefab)
     {
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -754,6 +794,10 @@ public static class GameSetup
         var islands5RootGO = new GameObject("Level5_AnchorBay");
         BuildAnchorBay(mats, islands5RootGO.transform);
 
+        // Level 6: Dreadhold — castle island on three pillars, wall cannons
+        var islands6RootGO = new GameObject("Level6_Dreadhold");
+        BuildDreadhold(mats, islands6RootGO.transform, cannonballPrefab, splashPrefab, explosionPrefab);
+
         // Level 4 clouds — 16 clouds orbiting the volcano at the same linear speed
         const float CloudLinearSpeed = 10.5f; // units per second
         var cloudsRootGO = new GameObject("Level4_Clouds");
@@ -816,6 +860,10 @@ public static class GameSetup
         else
             Debug.LogWarning("[ShipButtlr] pirat_ship.fbx not found — run Build All again after Unity imports it.");
 
+        var boatPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(DreadholdDir + "DreadholdBoat.fbx");
+        botShip.boatModel = boatPrefab;
+        VerifyBoatOrientation(boatPrefab);
+
         // ----- Camera -----
         var camGO = new GameObject("Main Camera");
         camGO.tag = "MainCamera";
@@ -860,7 +908,7 @@ public static class GameSetup
 
         // BotShip prefab — used by GameManager to spawn extra ships in Level 4
         var botShipPrefabGO = CreateBotShipPrefab(mats["Bot"], torpedoPrefab,
-            AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/PiratShip/pirat_ship.fbx"));
+            AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/PiratShip/pirat_ship.fbx"), boatPrefab);
 
         // ----- End Panel -----
         var endPanelGO = BuildEndPanel(hudGO.transform);
@@ -904,6 +952,7 @@ public static class GameSetup
         gm.islands3Root = islands3RootGO;
         gm.islands4Root  = islands4RootGO;
         gm.islands5Root  = islands5RootGO;
+        gm.islands6Root  = islands6RootGO;
         gm.botHPGroup    = botHealthBar.transform.parent.gameObject; // "BotHP" group
         gm.botShipPrefab = botShipPrefabGO;
         gm.cloudySkybox      = l4SkyboxMat;
@@ -931,6 +980,22 @@ public static class GameSetup
         timerRT.sizeDelta        = new Vector2(200f, 70f);
         timerGO.GetComponent<Text>().fontStyle = FontStyle.Bold;
         gm.timerText  = timerGO.GetComponent<Text>();
+
+        // Level 6 objective — top-centre (same slot as the L4 timer; never shown together)
+        var objGO = MakeText("ObjectiveText", hudGO.transform, "PILLARS LEFT: 3", 40, Color.white);
+        var objRT = objGO.GetComponent<RectTransform>();
+        objRT.anchorMin        = new Vector2(0.5f, 1f);
+        objRT.anchorMax        = new Vector2(0.5f, 1f);
+        objRT.pivot            = new Vector2(0.5f, 1f);
+        objRT.anchoredPosition = new Vector2(0f, -15f);
+        objRT.sizeDelta        = new Vector2(600f, 70f);
+        var objText = objGO.GetComponent<Text>();
+        objText.fontStyle     = FontStyle.Bold;
+        objText.raycastTarget = false;
+        var objOutline = objGO.AddComponent<Outline>();
+        objOutline.effectColor    = new Color(0f, 0f, 0f, 0.8f);
+        objOutline.effectDistance = new Vector2(2f, -2f);
+        gm.objectiveText = objText;
 
         // ----- Mobile Controls -----
         var circleSprite = MakeCircleSprite();
@@ -1068,7 +1133,7 @@ public static class GameSetup
     }
 
     // Creates a BotShip prefab for Level 4 dynamic spawning (no health bar)
-    static GameObject CreateBotShipPrefab(Material botMat, GameObject torpedoPrefab, GameObject piratModel)
+    static GameObject CreateBotShipPrefab(Material botMat, GameObject torpedoPrefab, GameObject piratModel, GameObject boatModel)
     {
         string path = "Assets/Prefabs/BotShip.prefab";
         var go = BuildShipGO("BotShip", Vector3.zero, Quaternion.identity, botMat);
@@ -1077,6 +1142,7 @@ public static class GameSetup
         bot.torpedoPrefab     = torpedoPrefab;
         bot.torpedoSpawnPoint = go.transform.Find("TorpedoSpawn");
         if (piratModel != null) bot.piratShipModel = piratModel;
+        bot.boatModel = boatModel;
         var prefab = SavePrefab(go, path);
         Object.DestroyImmediate(go);
         return prefab;
@@ -1166,7 +1232,7 @@ public static class GameSetup
     const string AnchorModelPath   = "Assets/Models/AnchorBay/AnchorModel.fbx";
 
     // Copies an FBX from outside Assets and imports it with external URP-compatible materials
-    static void ImportModel(string srcPath, string assetPath)
+    static void ImportModel(string srcPath, string assetPath, bool bakeAxis = false)
     {
         if (!System.IO.File.Exists(srcPath))
         {
@@ -1181,6 +1247,12 @@ public static class GameSetup
         {
             importer.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
             importer.materialLocation   = ModelImporterMaterialLocation.External;
+            if (bakeAxis)
+            {
+                importer.bakeAxisConversion = true;   // Blender -Z fwd / Y up → no runtime rotation needed
+                importer.useFileScale       = true;
+                importer.globalScale        = 1f;
+            }
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         }
         Debug.Log("[ShipButtlr] Imported " + assetPath);
@@ -1337,6 +1409,415 @@ public static class GameSetup
         hook.anchor = anchorPivot.transform;
         hook.chain  = lr;
         hook.island = big.GetComponent<IslandData>();
+    }
+
+    // -------------------------------------------------------------------------
+    // Level 6 — Dreadhold
+    // -------------------------------------------------------------------------
+
+    const string DreadholdDir = "Assets/Models/Dreadhold/";
+    static readonly string[] DreadholdModels =
+        { "DreadholdIsland", "DreadholdCastle", "DreadholdPillar", "DreadholdCannon", "DreadholdBoat" };
+
+    // Layout — must match 3d/level6/build_dreadhold.py
+    static readonly float[] L6PillarAngles = { 180f, 60f, 300f };          // deg from +Z toward +X
+    static readonly float[] L6CannonAngles = { 0f, 60f, 120f, 180f, 240f, 300f };   // 6 edge towers
+    const float L6PillarRadius   = 26.5f;
+    const float L6WallRadius     = 13.5f;  // edge tower ring radius (castle local)
+    const float L6TurretTop      = 6.3f;   // edge tower top = cannon mount (castle local)
+    const float L6PlateauY       = 10f;
+    const float L6IslandRadius   = 24f;    // ship collision radius (IslandData)
+    const float L6TorpedoRadius  = 22.5f;  // island torpedo capsule — inside the pillar ring
+    const float L6PillarColRadius = 2.2f;
+    const float L6PillarShipRadius = 2.5f;
+    const float L6MarkerY        = 11f;
+    const float L6TrunnionY      = 1.05f;
+    const float L6MuzzleZ        = 1.85f;
+
+    // Grey muzzle smoke for the L6 cannons: a puff blown out along the barrel that slows,
+    // grows, drifts up and fades. Soft round texture + material are saved assets (no pink on device).
+    static GameObject CreateCannonSmokePrefab()
+    {
+        string path    = "Assets/Prefabs/CannonSmoke.prefab";
+        string texPath = "Assets/Materials/SmokePuffTexture.asset";
+        string matPath = "Assets/Materials/CannonSmokeMaterial.mat";
+        if (AssetDatabase.LoadAssetAtPath<Object>(matPath) != null) AssetDatabase.DeleteAsset(matPath);
+        if (AssetDatabase.LoadAssetAtPath<Object>(texPath) != null) AssetDatabase.DeleteAsset(texPath);
+
+        const int N = 64;
+        var tex = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "SmokePuff" };
+        var rng = new System.Random(7);
+        var px = new Color[N * N];
+        for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++)
+            {
+                float dx = (x + 0.5f) / N * 2f - 1f, dy = (y + 0.5f) / N * 2f - 1f;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float a = Mathf.Clamp01(1f - r);
+                a = a * a * (0.85f + 0.15f * (float)rng.NextDouble());
+                px[y * N + x] = new Color(1f, 1f, 1f, a);
+            }
+        tex.SetPixels(px);
+        tex.Apply();
+        AssetDatabase.CreateAsset(tex, texPath);
+
+        var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Particles/Standard Unlit");
+        var mat = new Material(shader);
+        mat.SetTexture("_BaseMap", tex);
+        mat.SetColor("_BaseColor", Color.white);
+        mat.SetFloat("_Surface", 1f);
+        mat.SetFloat("_Blend", 0f);
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.renderQueue = 3000;
+        AssetDatabase.CreateAsset(mat, matPath);
+
+        var go = new GameObject("CannonSmoke");
+        var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        var main = ps.main;
+        main.duration        = 0.4f;
+        main.loop            = false;
+        main.startLifetime   = new ParticleSystem.MinMaxCurve(1.6f, 2.6f);
+        main.startSpeed      = new ParticleSystem.MinMaxCurve(4f, 10f);
+        main.startSize       = new ParticleSystem.MinMaxCurve(1.0f, 2.0f);
+        main.startRotation   = new ParticleSystem.MinMaxCurve(0f, 2f * Mathf.PI);
+        main.startColor      = new ParticleSystem.MinMaxGradient(new Color(0.55f, 0.55f, 0.55f, 0.9f), new Color(0.85f, 0.85f, 0.85f, 0.9f));
+        main.gravityModifier = new ParticleSystem.MinMaxCurve(-0.06f);   // drifts upward
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.stopAction      = ParticleSystemStopAction.Destroy;
+        main.maxParticles    = 64;
+
+        var emission = ps.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 16), new ParticleSystem.Burst(0.12f, 8) });
+
+        var shape = ps.shape;                 // cone along local +Z = barrel direction
+        shape.enabled   = true;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle     = 18f;
+        shape.radius    = 0.3f;
+
+        var limit = ps.limitVelocityOverLifetime;   // the blast slows down quickly, then hangs
+        limit.enabled = true;
+        limit.limit   = new ParticleSystem.MinMaxCurve(0.8f);
+        limit.dampen  = 0.12f;
+
+        var sol = ps.sizeOverLifetime;
+        sol.enabled = true;
+        sol.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.6f), new Keyframe(1f, 3f)));
+
+        var col = ps.colorOverLifetime;
+        col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.8f, 0.8f, 0.8f), 1f) },
+                  new[] { new GradientAlphaKey(0.9f, 0f), new GradientAlphaKey(0.6f, 0.4f), new GradientAlphaKey(0f, 1f) });
+        col.color = new ParticleSystem.MinMaxGradient(g);
+
+        var rol = ps.rotationOverLifetime;
+        rol.enabled = true;
+        rol.z = new ParticleSystem.MinMaxCurve(-0.6f, 0.6f);
+
+        var renderer = go.GetComponent<ParticleSystemRenderer>();
+        renderer.sharedMaterial = mat;
+
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    static GameObject CreateCannonballPrefab(GameObject splashPrefab, GameObject explosionPrefab, Material ironMat,
+                                             Material bombMat, GameObject bombMarkerPrefab)
+    {
+        string path = "Assets/Prefabs/Cannonball.prefab";
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "Cannonball";
+        go.transform.localScale = Vector3.one * 1.2f;
+        Object.DestroyImmediate(go.GetComponent<Collider>());
+        go.GetComponent<MeshRenderer>().sharedMaterial = ironMat;
+        var ball = go.AddComponent<Cannonball>();
+        ball.splashPrefab    = splashPrefab;
+        ball.explosionPrefab = explosionPrefab;
+        ball.bombMaterial     = bombMat;          // bomb mode (2+ pillars down)
+        ball.bombMarkerPrefab = bombMarkerPrefab; // red landing disc, scaled to Cannonball.BombRadius
+        var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    // Plain (non prefab-linked) copy of an imported model, so its children can be re-parented at runtime
+    static GameObject PlaceModel(GameObject model, Transform parent, Vector3 localPos, Quaternion localRot,
+                                 string name, System.Collections.Generic.Dictionary<string, Material> mats)
+    {
+        var go = (GameObject)Object.Instantiate(model);
+        go.name = name;
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPos;
+        // Keep the model root's own import rotation: for a single-mesh FBX Unity puts the
+        // Blender axis fix (≈ 90° X) on the root itself, so overwriting it tips the model over.
+        go.transform.localRotation = localRot * model.transform.localRotation;
+        go.transform.localScale    = Vector3.one;
+        foreach (var col in go.GetComponentsInChildren<Collider>(true))
+            Object.DestroyImmediate(col);
+        RemapL6Materials(go, mats);
+        return go;
+    }
+
+    // Swap the FBX-imported materials for the saved URP materials with the same slot name
+    static void RemapL6Materials(GameObject go, System.Collections.Generic.Dictionary<string, Material> mats)
+    {
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+        {
+            var shared = r.sharedMaterials;
+            for (int i = 0; i < shared.Length; i++)
+            {
+                if (shared[i] == null) continue;
+                string n = shared[i].name;
+                foreach (var kv in mats)
+                {
+                    if (!kv.Key.StartsWith("L6_")) continue;
+                    if (n == kv.Key || n.StartsWith(kv.Key + ".") || n.StartsWith(kv.Key + " "))
+                    {
+                        shared[i] = kv.Value;
+                        break;
+                    }
+                }
+            }
+            r.sharedMaterials = shared;
+        }
+    }
+
+    static Bounds WorldBounds(GameObject go)
+    {
+        bool has = false;
+        Bounds b = new Bounds(go.transform.position, Vector3.zero);
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!has) { b = r.bounds; has = true; }
+            else b.Encapsulate(r.bounds);
+        }
+        return b;
+    }
+
+    // World-space mesh vertex with the highest Y (used to tell the boat's stern — mast/flag — from its bow)
+    static Vector3 HighestVertex(GameObject go)
+    {
+        Vector3 best = go.transform.position;
+        float bestY = float.NegativeInfinity;
+        foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (mf.sharedMesh == null) continue;
+            foreach (var v in mf.sharedMesh.vertices)
+            {
+                var w = mf.transform.TransformPoint(v);
+                if (w.y > bestY) { bestY = w.y; best = w; }
+            }
+        }
+        return best;
+    }
+
+    static void CheckOrientation(string label, bool ok, string details)
+    {
+        if (ok) Debug.Log($"[ShipButtlr] Orientation OK   — {label}: {details}");
+        else    Debug.LogError($"[ShipButtlr] Orientation FAIL — {label}: {details}");
+    }
+
+    // Instantiates the boat exactly as BotShip.AttachModel does (root import rotation kept) and verifies:
+    // upright (mast up, little below the waterline), long axis along Z, mast/flag at the stern → bow is +Z.
+    static void VerifyBoatOrientation(GameObject boatPrefab)
+    {
+        if (boatPrefab == null) return;
+        var go = (GameObject)Object.Instantiate(boatPrefab);
+        // Same rotation BotShip.ApplyBoatVisual uses (import axis fix + BoatYawFix)
+        go.transform.SetPositionAndRotation(Vector3.zero,
+            Quaternion.Euler(0f, BotShip.BoatYawFix, 0f) * boatPrefab.transform.localRotation);
+        var b  = WorldBounds(go);
+        var hi = HighestVertex(go);
+        CheckOrientation("DreadholdBoat upright", b.size.y > 3.5f && b.size.y < 6f && b.min.y > -1f,
+                         $"size={b.size} min.y={b.min.y:F2} (expect height ≈4.9, keel ≈ -0.45)");
+        CheckOrientation("DreadholdBoat length along Z", b.size.z > 7f && b.size.z > b.size.x * 2f,
+                         $"size.x={b.size.x:F2} size.z={b.size.z:F2} (expect ≈2.8 × 8)");
+        CheckOrientation("DreadholdBoat bow toward +Z", hi.z < 0f,
+                         $"highest point (flag) at z={hi.z:F2} (expect stern, z < 0)");
+        Object.DestroyImmediate(go);
+    }
+
+    static void LogBounds(GameObject go, string label)
+    {
+        bool has = false;
+        Bounds b = new Bounds();
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+        {
+            if (!has) { b = r.bounds; has = true; }
+            else b.Encapsulate(r.bounds);
+        }
+        Debug.Log($"[ShipButtlr] {label}: center={b.center} size={b.size} min={b.min} max={b.max}");
+    }
+
+    static void BuildDreadhold(System.Collections.Generic.Dictionary<string, Material> mats, Transform root,
+                               GameObject cannonballPrefab, GameObject splashPrefab, GameObject explosionPrefab)
+    {
+        var smokePrefab = CreateCannonSmokePrefab();
+        var islandModel = AssetDatabase.LoadAssetAtPath<GameObject>(DreadholdDir + "DreadholdIsland.fbx");
+        var castleModel = AssetDatabase.LoadAssetAtPath<GameObject>(DreadholdDir + "DreadholdCastle.fbx");
+        var pillarModel = AssetDatabase.LoadAssetAtPath<GameObject>(DreadholdDir + "DreadholdPillar.fbx");
+        var cannonModel = AssetDatabase.LoadAssetAtPath<GameObject>(DreadholdDir + "DreadholdCannon.fbx");
+        if (islandModel == null || castleModel == null || pillarModel == null || cannonModel == null)
+        {
+            Debug.LogWarning("[ShipButtlr] Dreadhold models missing — run 3d/level6/build_dreadhold.py in Blender, then Build All again.");
+            return;
+        }
+
+        // Island root: tag, ship collision radius, torpedo capsule (tall, so its radius is full at y 0.8)
+        var island = new GameObject("DreadholdIsland");
+        island.transform.SetParent(root, false);
+        island.tag = "Island";
+        island.AddComponent<IslandData>().radius = L6IslandRadius;
+        var cap = island.AddComponent<CapsuleCollider>();
+        cap.radius = L6TorpedoRadius;
+        cap.height = 80f;
+        cap.center = Vector3.zero;
+
+        // Everything that sinks at the end: island rock, castle, cannons
+        var visual = new GameObject("Visual");
+        visual.transform.SetParent(island.transform, false);
+
+        var rock = PlaceModel(islandModel, visual.transform, Vector3.zero, Quaternion.identity, "IslandModel", mats);
+        LogBounds(rock, "DreadholdIsland");
+        var castle = PlaceModel(castleModel, visual.transform, new Vector3(0f, L6PlateauY, 0f), Quaternion.identity, "CastleModel", mats);
+        LogBounds(castle, "DreadholdCastle");
+
+        // Edge-tower cannons — one on top of each of the 6 hex-wall towers, full 360° traverse (no blind zones).
+        // Parented to the un-rotated Visual node: CastleModel's root carries the FBX axis-fix rotation
+        // (≈ 90° X), so child positions given in "castle space" would land in the wrong place.
+        for (int i = 0; i < L6CannonAngles.Length; i++)
+        {
+            float a = L6CannonAngles[i] * Mathf.Deg2Rad;
+            var outward = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+            var pivot = new GameObject("Cannon_" + i);
+            pivot.transform.SetParent(visual.transform, false);
+            pivot.transform.localPosition = new Vector3(0f, L6PlateauY, 0f) + outward * L6WallRadius + Vector3.up * L6TurretTop;
+            // Seat the cannon on the real mesh: highest castle surface straight below/above this spot
+            Vector3 wp = pivot.transform.position;
+            float topY = SurfaceHeight(castle, wp, wp.y);
+            CheckOrientation($"Cannon_{i} on edge-tower top", Mathf.Abs(topY - wp.y) < 0.3f,
+                             $"tower top raycast y={topY:F2}, expected y={wp.y:F2} at xz=({wp.x:F1}, {wp.z:F1})");
+            pivot.transform.position = new Vector3(wp.x, topY, wp.z);
+            pivot.transform.localRotation = Quaternion.LookRotation(outward);
+
+            var cannon = PlaceModel(cannonModel, pivot.transform, Vector3.zero, Quaternion.identity, "CannonModel", mats);
+            var barrel = cannon.transform.Find("Barrel");
+            Transform muzzle = null;
+            if (barrel != null)
+            {
+                // The Barrel node carries its own axis-fix rotation, so place the muzzle in the
+                // cannon root's (Unity-oriented) frame: trunnion + MuzzleZ along +Z
+                var m = new GameObject("Muzzle");
+                m.transform.SetParent(barrel, false);
+                m.transform.position = cannon.transform.TransformPoint(barrel.localPosition + Vector3.forward * L6MuzzleZ);
+                muzzle = m.transform;
+            }
+            else Debug.LogWarning("[ShipButtlr] DreadholdCannon has no 'Barrel' child.");
+            if (i == 0)
+            {
+                LogBounds(cannon, "DreadholdCannon_0");
+                if (barrel != null)
+                    Debug.Log($"[ShipButtlr] Cannon_0 barrel localPos={barrel.localPosition} localRot={barrel.localEulerAngles} muzzleWorld={muzzle.position} pivotWorld={pivot.transform.position}");
+            }
+
+            var cc = pivot.AddComponent<CastleCannon>();
+            cc.barrel           = barrel;
+            cc.muzzle           = muzzle;
+            cc.cannonballPrefab = cannonballPrefab;
+            cc.flashPrefab      = explosionPrefab;
+            cc.smokePrefab      = smokePrefab;
+        }
+
+        // Pillars — stand in the sea under the rim's corbel lips (not part of the sinking visual)
+        var pillars = new System.Collections.Generic.List<CastlePillar>();
+        for (int i = 0; i < L6PillarAngles.Length; i++)
+        {
+            float a = L6PillarAngles[i] * Mathf.Deg2Rad;
+            var pos = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * L6PillarRadius;
+            var pgo = new GameObject("Pillar_" + i);
+            pgo.transform.SetParent(island.transform, false);
+            pgo.transform.localPosition = pos;
+
+            var col = pgo.AddComponent<CapsuleCollider>();
+            col.radius = L6PillarColRadius;
+            col.height = 8.5f;
+            col.center = new Vector3(0f, 2.75f, 0f);
+            pgo.AddComponent<IslandData>().radius = L6PillarShipRadius;
+
+            var model = PlaceModel(pillarModel, pgo.transform, Vector3.zero, Quaternion.identity, "PillarModel", mats);
+            if (i == 0) LogBounds(model, "DreadholdPillar_0");
+            var mt = model.transform;
+
+            var p = pgo.AddComponent<CastlePillar>();
+            p.drums        = new Transform[5];
+            p.damagedDrums = new Transform[5];
+            for (int d = 0; d < 5; d++)
+            {
+                p.drums[d]        = mt.Find("Drum_" + d);
+                p.damagedDrums[d] = mt.Find("Drum_" + d + "_Damaged");
+                if (p.damagedDrums[d] != null) p.damagedDrums[d].gameObject.SetActive(false);
+            }
+            p.capital   = mt.Find("Capital");
+            p.baseStone = mt.Find("Base");
+            var ring = mt.Find("GlowRing");
+            p.glowRing  = ring != null ? ring.GetComponent<Renderer>() : null;
+            p.marker    = mt.Find("Marker");
+            if (p.marker != null) p.marker.localPosition = new Vector3(0f, L6MarkerY, 0f);
+
+            var chunk = mt.Find("Chunk");
+            if (chunk != null)
+            {
+                var mf = chunk.GetComponent<MeshFilter>();
+                p.chunkMesh = mf != null ? mf.sharedMesh : null;
+                Object.DestroyImmediate(chunk.gameObject);
+            }
+            p.chunkMaterial    = mats["L6_PillarStone"];
+            p.runeMaterial     = mats["L6_Rune"];
+            p.runeDeadMaterial = mats["L6_RuneDead"];
+            p.splashPrefab     = splashPrefab;
+            p.explosionPrefab  = explosionPrefab;
+            pillars.Add(p);
+        }
+
+        var ci = island.AddComponent<CastleIsland>();
+        ci.pillars      = pillars.ToArray();
+        ci.sinkRoot     = visual.transform;
+        ci.splashPrefab = splashPrefab;
+        foreach (var p in pillars) p.island = ci;
+
+        // ----- Orientation checks (Unity API: world bounds of what was actually placed) -----
+        var rb = WorldBounds(rock);
+        CheckOrientation("DreadholdIsland upright", rb.size.y > 10f && rb.size.y < 18f && rb.size.x > 48f && rb.size.z > 48f,
+                         $"size={rb.size} (expect ≈ 55 × 14 × 55)");
+        var cb = WorldBounds(castle);
+        CheckOrientation("DreadholdCastle upright", Mathf.Abs(cb.min.y - L6PlateauY) < 1.5f && cb.max.y > 35f && cb.size.x < 32f && cb.size.z < 32f,
+                         $"min.y={cb.min.y:F2} max.y={cb.max.y:F2} size={cb.size} (expect base ≈10, spire ≈40, ≈28 wide)");
+        if (pillars.Count > 0)
+        {
+            var pb = WorldBounds(pillars[0].gameObject);
+            CheckOrientation("DreadholdPillar upright", Mathf.Abs(pb.min.y + 1.5f) < 0.6f && pb.max.y > 5f && pb.max.y < 13.5f,
+                             $"min.y={pb.min.y:F2} max.y={pb.max.y:F2} (expect -1.5 … ≈5.8, marker ≈13)");
+        }
+        var cannon0 = visual.transform.Find("Cannon_0");
+        var cc0 = cannon0 != null ? cannon0.GetComponent<CastleCannon>() : null;
+        if (cc0 != null && cc0.muzzle != null && cc0.barrel != null)
+        {
+            Vector3 pv = cannon0.position, mz = cc0.muzzle.position;
+            float rPivot = new Vector2(pv.x, pv.z).magnitude, rMuzzle = new Vector2(mz.x, mz.z).magnitude;
+            CheckOrientation("DreadholdCannon barrel points outward", rMuzzle > rPivot + 1.2f && Mathf.Abs(mz.y - (pv.y + L6TrunnionY)) < 0.3f,
+                             $"pivot r={rPivot:F2} y={pv.y:F2}, muzzle r={rMuzzle:F2} y={mz.y:F2}");
+            var cbnd = WorldBounds(cannon0.gameObject);
+            CheckOrientation("DreadholdCannon upright", cbnd.size.y < 1.8f && cbnd.min.y > pv.y - 0.2f,
+                             $"size={cbnd.size} min.y={cbnd.min.y:F2} pivot.y={pv.y:F2}");
+        }
     }
 
     static void CreateIsland(Vector3 pos, float radius, int treeCount,
@@ -1782,6 +2263,18 @@ public static class GameSetup
         isle5RT.offsetMin = Vector2.zero;
         isle5RT.offsetMax = Vector2.zero;
 
+        // Island 6 — Dreadhold (locked until CurrentLevel >= 6)
+        // Island body on Level_6.png ≈ x 890–1215, y 80–330 px of 1536×1024 (castle + rock, label excluded)
+        var isle6GO = new GameObject("Island6Button");
+        isle6GO.transform.SetParent(panel.transform, false);
+        isle6GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+        var isle6Btn = isle6GO.AddComponent<Button>();
+        var isle6RT  = isle6GO.GetComponent<RectTransform>();
+        isle6RT.anchorMin = new Vector2(0.58f, 0.68f);
+        isle6RT.anchorMax = new Vector2(0.79f, 0.92f);
+        isle6RT.offsetMin = Vector2.zero;
+        isle6RT.offsetMax = Vector2.zero;
+
         // Close button — top-right corner
         var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
         var closeRT    = closeBtnGO.GetComponent<RectTransform>();
@@ -1797,6 +2290,7 @@ public static class GameSetup
         script.island3Button = isle3Btn;
         script.island4Button = isle4Btn;
         script.island5Button = isle5Btn;
+        script.island6Button = isle6Btn;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
@@ -1804,6 +2298,7 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(isle3Btn.onClick, script.OnIsland3Clicked);
         UnityEventTools.AddPersistentListener(isle4Btn.onClick, script.OnIsland4Clicked);
         UnityEventTools.AddPersistentListener(isle5Btn.onClick, script.OnIsland5Clicked);
+        UnityEventTools.AddPersistentListener(isle6Btn.onClick, script.OnIsland6Clicked);
         UnityEventTools.AddPersistentListener(
             closeBtnGO.GetComponent<Button>().onClick,
             script.OnCloseMapClicked);

@@ -55,6 +55,7 @@ public class MainMenu : MonoBehaviour
     public Button     island3Button;
     public Button     island4Button;
     public Button     island5Button;
+    public Button     island6Button;
 
     private static readonly string[] s_validPromoCodes =
         { "pizza1","pizza2","pizza3","pizza4","pizza5","pizza6","pizza7","pizza8","godship", "щука" };
@@ -438,6 +439,7 @@ public class MainMenu : MonoBehaviour
         if (island3Button != null) island3Button.interactable = lvl >= 3;
         if (island4Button != null) island4Button.interactable = lvl >= 4;
         if (island5Button != null) island5Button.interactable = lvl >= 5;
+        if (island6Button != null) island6Button.interactable = lvl >= 6;
         if (mapPanel != null) mapPanel.SetActive(true);
     }
 
@@ -476,11 +478,18 @@ public class MainMenu : MonoBehaviour
         SceneManager.LoadScene("GameScene");
     }
 
+    public void OnIsland6Clicked()
+    {
+        levelToPlay = 6;
+        SceneManager.LoadScene("GameScene");
+    }
+
     void RefreshMapImage()
     {
         if (mapImage == null) return;
         int lvl = PlayerPrefs.GetInt("CurrentLevel", 1);
-        string spriteName = lvl >= 5 ? "Level_5"
+        string spriteName = lvl >= 6 ? "Level_6"
+                          : lvl >= 5 ? "Level_5"
                           : lvl >= 4 ? "Level_4"
                           : lvl >= 3 ? "Level_3"
                           : lvl >= 2 ? "Level_2"
