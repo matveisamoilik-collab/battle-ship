@@ -33,6 +33,38 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 - Unity Test Framework (com.unity.test-framework 1.6.0) is available for writing Play Mode and Edit Mode tests via the Unity Test Runner window
 - **Rebuild scenes from scratch**: run `ShipButtlr > Build All` from the Unity menu bar — this executes `Assets/Scripts/Editor/GameSetup.cs`, which programmatically creates all materials, prefabs, and both scenes. Script-only changes (no scene/material changes) are picked up by Unity automatically without a rebuild.
 
+### Unity Editor & Batch-Mode Integration
+
+**Installed editor:** `C:\Program Files\Unity\Hub\Editor\6000.3.7f1\Editor\Unity.exe` (Unity Hub install, version matches the project).
+
+Claude Code can't drive the editor UI, but it **can run Unity headless from the terminal in batch mode**. It can check compilation, run tests and run editor scripts without opening the editor. **The Unity Editor must be closed for this project first.** Unity locks the project (`Temp/UnityLockfile`), so a second instance on the same project fails.
+
+Common commands (PowerShell; `-logFile` is required because batch mode prints nothing to the console). Use `Start-Process -Wait` so the shell waits for Unity to exit:
+
+```powershell
+$unity = "C:\Program Files\Unity\Hub\Editor\6000.3.7f1\Editor\Unity.exe"
+$proj  = "C:\project\battle-ship"
+
+# Compile check: imports the project, compiles all scripts, quits. Look for "error CS" in the log.
+Start-Process $unity -Wait -ArgumentList "-batchmode -nographics -quit -projectPath `"$proj`" -logFile `"$proj\Logs\batch_compile.log`""
+
+# Run EditMode tests (use -testPlatform PlayMode for Play Mode tests). Results are NUnit XML.
+# Do NOT pass -quit with -runTests; Unity exits by itself when the tests finish.
+Start-Process $unity -Wait -ArgumentList "-batchmode -nographics -projectPath `"$proj`" -runTests -testPlatform EditMode -testResults `"$proj\Logs\TestResults_EditMode.xml`" -logFile `"$proj\Logs\batch_tests.log`""
+
+# Run an editor method headless, e.g. rebuild all scenes/materials/prefabs (same as ShipButtlr > Build All):
+Start-Process $unity -Wait -ArgumentList "-batchmode -quit -projectPath `"$proj`" -executeMethod GameSetup.BuildAll -logFile `"$proj\Logs\batch_buildall.log`""
+```
+
+Notes:
+- Exit code: 0 = success, 2 = tests failed, 3 = run/compile error. Always read the log file and the test-results XML. The exit code alone is not enough.
+- `-executeMethod` needs a **static** method on a class in an `Editor` folder. `GameSetup.BuildAll` is `static` (private). If Unity reports it can't find the method, make it `public static`. Omit `-nographics` for Build All because it creates materials, and rendering may be needed.
+- PlayMode tests in batch mode run real scenes. Gameplay that needs input can be tested by calling public methods directly (e.g. `TakeDamage()`, `GameManager.BotDefeated()`), not by simulating keys.
+- **No tests exist yet.** To add them, create `Assets/Tests/EditMode/` and/or `Assets/Tests/PlayMode/`, each with an `.asmdef` that references `UnityEngine.TestRunner`, `UnityEditor.TestRunner` (EditMode only) and `nunit.framework.dll`. Game scripts live in the default `Assembly-CSharp`, which an asmdef **cannot reference**, so the scripts would first need their own asmdef (e.g. `Assets/Scripts/ShipButtlr.asmdef` referencing `Unity.InputSystem` and `UnityEngine.UI`, with the `Editor` folder getting a separate editor-only asmdef).
+- PlayerPrefs written by tests are the editor's real PlayerPrefs (Windows registry). Tests should save and restore keys such as `"Coins"` and `"CurrentLevel"`, or call `PlayerPrefs.DeleteAll()` only when that's acceptable.
+- Batch-mode Android builds are possible via `-buildTarget Android -executeMethod <SomeBuildScript>`, but no build script exists yet. APK/AAB builds are currently done from the editor (output folders `apk/`, `aab/`).
+- Live editor control (enter Play mode, read the console, screenshots) would need a third-party Unity MCP bridge package. **None is installed.**
+
 ## Player Controls
 
 - **Move**: WASD or arrow keys (forward/back/turn) **or virtual joystick** (left side of screen on Android)
