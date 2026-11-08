@@ -105,5 +105,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Cannonball
   splashPrefab: {fileID: 9108487771618202910, guid: a82a622fc0529084eb840cec4e490f68, type: 3}
   explosionPrefab: {fileID: 9133770636241916477, guid: 95a8b89be36faa74caf677a90c3abb22, type: 3}
-  bombMarkerPrefab: {fileID: 66444296185532103, guid: ff0bc03e3debeea4d91cbb8eb2645724, type: 3}
+  bombMarkerPrefab: {fileID: 5848468664522907875, guid: ff0bc03e3debeea4d91cbb8eb2645724, type: 3}
   bombMaterial: {fileID: 2100000, guid: 0b67db36b8139eb4f83490a53eec31bc, type: 2}

@@ -131,6 +131,13 @@ public static class GameSetup
         dict["L6_BoatDeck"]    = MakeMat("L6_BoatDeck",    new Color(0.55f, 0.40f, 0.22f));
         dict["L6_Flag"]        = MakeMat("L6_Flag",        new Color(0.08f, 0.08f, 0.08f));
         dict["L6_RuneDead"]    = MakeMat("L6_RuneDead",    new Color(0.18f, 0.12f, 0.08f));
+        // Level 6 seagull (DreadholdSeagull.fbx) — also used for its dropping
+        dict["L6_GullWhite"]   = MakeMat("L6_GullWhite",   new Color(0.95f, 0.95f, 0.93f));
+        dict["L6_GullGrey"]    = MakeMat("L6_GullGrey",    new Color(0.58f, 0.62f, 0.68f));
+        dict["L6_GullBlack"]   = MakeMat("L6_GullBlack",   new Color(0.05f, 0.05f, 0.06f));
+        dict["L6_GullBeak"]    = MakeMat("L6_GullBeak",    new Color(0.98f, 0.78f, 0.12f));
+        dict["L6_GullLeg"]     = MakeMat("L6_GullLeg",     new Color(0.95f, 0.55f, 0.35f));
+        dict["L6_GullRed"]     = MakeMat("L6_GullRed",     new Color(0.85f, 0.12f, 0.08f));
         // Glowing pillar rune bands — emissive, saved as an asset (an unsaved one renders pink on device)
         var rune = MakeMat("L6_Rune", new Color(1.00f, 0.55f, 0.10f));
         rune.EnableKeyword("_EMISSION");
@@ -797,6 +804,7 @@ public static class GameSetup
         // Level 6: Dreadhold — castle island on three pillars, wall cannons
         var islands6RootGO = new GameObject("Level6_Dreadhold");
         BuildDreadhold(mats, islands6RootGO.transform, cannonballPrefab, splashPrefab, explosionPrefab);
+        var seagullPrefab = CreateSeagullPrefab(mats);
 
         // Level 4 clouds — 16 clouds orbiting the volcano at the same linear speed
         const float CloudLinearSpeed = 10.5f; // units per second
@@ -887,6 +895,25 @@ public static class GameSetup
 
         // EventSystem
         CreateEventSystem();
+
+        // Level 6 seagull droppings on the lens — first HUD child, so the HUD draws on top of it
+        var splatGO = new GameObject("PoopSplat");
+        splatGO.transform.SetParent(hudGO.transform, false);
+        var splatImg = splatGO.AddComponent<RawImage>();
+        splatImg.raycastTarget = false;
+        splatImg.enabled       = false;
+        var splatRT = splatGO.GetComponent<RectTransform>();
+        splatRT.anchorMin = Vector2.zero;
+        splatRT.anchorMax = Vector2.one;
+        splatRT.offsetMin = Vector2.zero;
+        splatRT.offsetMax = Vector2.zero;
+        var cameraSplat = splatGO.AddComponent<CameraSplat>();
+        if (seagullPrefab != null)
+        {
+            var gullSpawner = islands6RootGO.AddComponent<SeagullSpawner>();
+            gullSpawner.seagullPrefab = seagullPrefab;
+            gullSpawner.splat         = cameraSplat;
+        }
 
         // Player HP bar — bottom-left
         HealthBar playerHealthBar = CreateHPBar(
@@ -1417,7 +1444,7 @@ public static class GameSetup
 
     const string DreadholdDir = "Assets/Models/Dreadhold/";
     static readonly string[] DreadholdModels =
-        { "DreadholdIsland", "DreadholdCastle", "DreadholdPillar", "DreadholdCannon", "DreadholdBoat" };
+        { "DreadholdIsland", "DreadholdCastle", "DreadholdPillar", "DreadholdCannon", "DreadholdBoat", "DreadholdSeagull" };
 
     // Layout — must match 3d/level6/build_dreadhold.py
     static readonly float[] L6PillarAngles = { 180f, 60f, 300f };          // deg from +Z toward +X
@@ -1544,6 +1571,51 @@ public static class GameSetup
         ball.bombMaterial     = bombMat;          // bomb mode (2+ pillars down)
         ball.bombMarkerPrefab = bombMarkerPrefab; // red landing disc, scaled to Cannonball.BombRadius
         var prefab = SavePrefab(go, path);
+        Object.DestroyImmediate(go);
+        return prefab;
+    }
+
+    // Level 6 seagull: wrapper with the Seagull script + the Blender model (beak turned to +Z,
+    // checked from the beak geometry, since the FBX axis conversion can land it facing -Z).
+    static GameObject CreateSeagullPrefab(System.Collections.Generic.Dictionary<string, Material> mats)
+    {
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(DreadholdDir + "DreadholdSeagull.fbx");
+        if (model == null)
+        {
+            Debug.LogWarning("[ShipButtlr] DreadholdSeagull.fbx missing — run 3d/level6/build_dreadhold.py in Blender, then Build All again.");
+            return null;
+        }
+        var go = new GameObject("Seagull");
+        var visual = PlaceModel(model, go.transform, Vector3.zero, Quaternion.identity, "Model", mats);
+
+        Vector3 beak = Vector3.zero; int n = 0;
+        Bounds wb = WorldBounds(visual);
+        foreach (var mf in visual.GetComponentsInChildren<MeshFilter>(true))
+        {
+            var mr = mf.GetComponent<MeshRenderer>();
+            if (mf.sharedMesh == null || mr == null) continue;
+            var sm = mr.sharedMaterials;
+            for (int i = 0; i < sm.Length && i < mf.sharedMesh.subMeshCount; i++)
+            {
+                if (sm[i] != mats["L6_GullBeak"]) continue;
+                var verts = mf.sharedMesh.vertices;
+                foreach (int vi in mf.sharedMesh.GetTriangles(i)) { beak += mf.transform.TransformPoint(verts[vi]); n++; }
+            }
+        }
+        if (n > 0) beak /= n;
+        if (n > 0 && beak.z < 0f)
+        {
+            visual.transform.localRotation = Quaternion.Euler(0f, 180f, 0f) * visual.transform.localRotation;
+            beak = new Vector3(-beak.x, beak.y, -beak.z);
+        }
+        CheckOrientation("DreadholdSeagull beak toward +Z", n > 0 && beak.z > 0.5f,
+                         $"beak centre={beak} (expect z ≈ 0.75)");
+        CheckOrientation("DreadholdSeagull wings along X, upright", wb.size.x > 2.6f && wb.size.x > wb.size.z * 1.4f && wb.size.y < 0.8f,
+                         $"size={wb.size} (expect ≈ 3.0 × 0.5 × 1.8)");
+
+        var gull = go.AddComponent<Seagull>();
+        gull.poopMaterial = mats["L6_GullWhite"];
+        var prefab = SavePrefab(go, "Assets/Prefabs/Seagull.prefab");
         Object.DestroyImmediate(go);
         return prefab;
     }

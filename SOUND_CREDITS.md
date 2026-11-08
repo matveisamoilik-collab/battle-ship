@@ -15,3 +15,5 @@ Files were trimmed, converted to mono and peak-normalized, then saved as `Assets
 | `anchor_reel` | [Chain winch sounds](https://opengameart.org/content/chain-winch-sounds) | winch - Region #1.wav |
 | `victory` | [Victory](https://opengameart.org/content/victory) — celestialghost8 | Victory.wav |
 | `defeat` | [Game over short jingle](https://opengameart.org/content/game-over-short-jingle) — Kosmo The Cat | Game over jingle.ogg |
+
+`seagull_cry` and `poop_splat` are not downloaded. They are synthesised by `3d/level6/make_seagull_sounds.py` (original, no licence restrictions) and saved as `.wav`.

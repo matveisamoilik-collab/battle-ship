@@ -11,6 +11,8 @@ Builds every Level 6 model procedurally (seeded, so the output is reproducible),
   DreadholdPillar.fbx  - Base, Drum_0..4, Drum_0..4_Damaged, Capital, Chunk, GlowRing, Marker
   DreadholdCannon.fbx  - Carriage + Barrel (pivot at the trunnion, points +Z in Unity)
   DreadholdBoat.fbx    - small enemy gunboat, 8 units long, bow +Z in Unity
+  DreadholdSeagull.fbx - Body, WingL/WingR (pivot at the shoulder), WingTipL/WingTipR (pivot at
+                         the wrist); beak +Z, wings along X. Seagull.cs flaps the wings in code.
 
 All geometry is written in UNITY coordinates (Y up, +Z forward, metres = Unity units) and
 converted with U() to Blender space. Unity imports the FBX with bakeAxisConversion = true.
@@ -56,6 +58,12 @@ MAT_COLORS = {
     "L6_BoatHull":    (0.35, 0.12, 0.10),
     "L6_BoatDeck":    (0.55, 0.40, 0.22),
     "L6_Flag":        (0.08, 0.08, 0.08),
+    "L6_GullWhite":   (0.95, 0.95, 0.93),
+    "L6_GullGrey":    (0.58, 0.62, 0.68),
+    "L6_GullBlack":   (0.05, 0.05, 0.06),
+    "L6_GullBeak":    (0.98, 0.78, 0.12),
+    "L6_GullLeg":     (0.95, 0.55, 0.35),
+    "L6_GullRed":     (0.85, 0.12, 0.08),
 }
 
 
@@ -527,6 +535,99 @@ def build_boat():
 
 
 # ---------------------------------------------------------------------------
+# Seagull (origin = body centre, beak +Z, wings along X, ~1.5 long, ~3 wingspan)
+# The wings are separate objects so Seagull.cs can flap them: WingL/WingR pivot at the
+# shoulder, WingTipL/WingTipR pivot at the wrist (Unity re-parents the tips at runtime).
+# ---------------------------------------------------------------------------
+GULL_SHOULDER_X = 0.12
+GULL_WRIST_X    = 0.80
+GULL_WING_Y     = 0.10
+
+
+def slab(mb, outline, y, thick, top, bottom, side):
+    """Extrude a convex XZ outline (Unity coords) by thick, centred on y."""
+    n = len(outline)
+    lo = [mb.v((x, y - thick / 2, z)) for x, z in outline]
+    hi = [mb.v((x, y + thick / 2, z)) for x, z in outline]
+    mb.f(tuple(hi), top)
+    mb.f(tuple(reversed(lo)), bottom)
+    for j in range(n):
+        k = (j + 1) % n
+        mb.f((lo[j], lo[k], hi[k], hi[j]), side)
+
+
+def loft(mb, rings, seg, mat_top, mat_bottom, tip_front, tip_back):
+    """Body of revolution-ish: rings = [(z, yc, rx, ry)], tail -> head, pointed ends."""
+    ids = []
+    for z, yc, rx, ry in rings:
+        row = []
+        for j in range(seg):
+            a = 2 * math.pi * j / seg
+            row.append(mb.v((math.cos(a) * rx, yc + math.sin(a) * ry, z)))
+        ids.append(row)
+
+    def mat_for(j):  # upper half of the ring = back (top) colour
+        a = 2 * math.pi * (j + 0.5) / seg
+        return mat_top if math.sin(a) > 0.35 else mat_bottom
+
+    for r in range(len(ids) - 1):
+        a, b = ids[r], ids[r + 1]
+        for j in range(seg):
+            k = (j + 1) % seg
+            mb.f((a[j], a[k], b[k], b[j]), mat_for(j))
+    back, front = mb.v(tip_back), mb.v(tip_front)
+    for j in range(seg):
+        k = (j + 1) % seg
+        mb.f((ids[0][k], ids[0][j], back), mat_for(j))
+        mb.f((ids[-1][j], ids[-1][k], front), mat_for(j))
+
+
+def build_seagull():
+    W, G, K = "L6_GullWhite", "L6_GullGrey", "L6_GullBlack"
+    objs = []
+
+    mb = MB()
+    loft(mb, [  # (z, y centre, half-width, half-height)
+        (-0.58, 0.06, 0.08, 0.05), (-0.42, 0.04, 0.15, 0.11), (-0.20, 0.01, 0.21, 0.18),
+        (0.05, 0.02, 0.21, 0.19), (0.24, 0.07, 0.15, 0.14), (0.34, 0.13, 0.115, 0.115),
+        (0.44, 0.18, 0.13, 0.13), (0.55, 0.19, 0.11, 0.11), (0.63, 0.18, 0.065, 0.07),
+    ], 12, W, W, tip_front=(0.0, 0.18, 0.67), tip_back=(0.0, 0.07, -0.64))
+    # grey mantle on the back between the wings
+    slab(mb, [(-0.14, 0.22), (0.14, 0.22), (0.12, -0.42), (-0.12, -0.42)], 0.19, 0.03, G, G, G)
+    # tail fan (white with black band)
+    slab(mb, [(-0.07, -0.50), (0.07, -0.50), (0.17, -0.80), (-0.17, -0.80)], 0.07, 0.03, W, W, W)
+    slab(mb, [(-0.17, -0.80), (0.17, -0.80), (0.18, -0.86), (-0.18, -0.86)], 0.07, 0.03, K, K, K)
+    # beak with the red gonys spot, eyes, tucked legs + feet
+    mb.tube((0, 0.165, 0.62), (0, 0.145, 0.90), 0.045, 0.012, 8, "L6_GullBeak")
+    mb.box((0, 0.125, 0.82), (0.03, 0.035, 0.04), "L6_GullRed")
+    for sx in (-1, 1):
+        mb.box((sx * 0.105, 0.23, 0.52), (0.03, 0.045, 0.045), K)
+        mb.tube((sx * 0.07, -0.13, -0.05), (sx * 0.07, -0.17, -0.36), 0.025, 0.02, 6, "L6_GullLeg")
+        mb.box((sx * 0.07, -0.17, -0.42), (0.10, 0.02, 0.12), "L6_GullLeg")
+    objs.append(mb.build("Body"))
+
+    for side, tag in ((1, "R"), (-1, "L")):
+        sx = lambda pts: [(side * x, z) for x, z in (pts if side > 0 else list(reversed(pts)))]
+        # inner wing: shoulder -> wrist (grey top, white underside, white trailing edge)
+        mb = MB()
+        slab(mb, sx([(GULL_SHOULDER_X, 0.24), (GULL_WRIST_X, 0.19), (GULL_WRIST_X, -0.20),
+                     (GULL_SHOULDER_X, -0.30)]), GULL_WING_Y, 0.05, G, W, G)
+        slab(mb, sx([(GULL_SHOULDER_X, -0.30), (GULL_WRIST_X, -0.20), (GULL_WRIST_X, -0.26),
+                     (GULL_SHOULDER_X, -0.36)]), GULL_WING_Y, 0.04, W, W, W)
+        objs.append(mb.build("Wing" + tag, origin=(side * GULL_SHOULDER_X, GULL_WING_Y, 0.0)))
+        # wing tip: grey hand, black primaries with a white mirror spot
+        mb = MB()
+        slab(mb, sx([(GULL_WRIST_X, 0.19), (1.12, 0.12), (1.12, -0.24), (GULL_WRIST_X, -0.26)]),
+             GULL_WING_Y, 0.04, G, W, G)
+        slab(mb, sx([(1.12, 0.12), (1.50, -0.03), (1.42, -0.18), (1.12, -0.24)]),
+             GULL_WING_Y, 0.035, K, K, K)
+        slab(mb, sx([(1.30, -0.02), (1.38, -0.05), (1.36, -0.11), (1.28, -0.10)]),
+             GULL_WING_Y + 0.02, 0.01, W, W, W)
+        objs.append(mb.build("WingTip" + tag, origin=(side * GULL_WRIST_X, GULL_WING_Y, 0.0)))
+    return objs
+
+
+# ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
 def export(objs, filename):
@@ -559,6 +660,7 @@ def main():
         export(build_pillar(), "DreadholdPillar.fbx"),
         export(build_cannon(), "DreadholdCannon.fbx"),
         export([build_boat()], "DreadholdBoat.fbx"),
+        export(build_seagull(), "DreadholdSeagull.fbx"),
     ]
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT_DIR, "dreadhold.blend"), compress=True)
 
