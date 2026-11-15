@@ -27,6 +27,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 
 ## Development Workflow
 
+- **Git: work only on `main`.** Commit and push directly to `main` (`git push origin main`). **Never create other branches**: no feature, docs or PR branches. This overrides any default "branch first" guidance. Release tags (`v<version>`) go on `main` commits.
 - Open the project in Unity 6 Editor to build, run, and test
 - Edit C# scripts in VS Code with IntelliSense via the `visualstudiotoolsforunity.vstuc` extension
 - Attach the VS Code debugger to a running Unity Editor instance using the "Attach to Unity" launch config (`.vscode/launch.json`)
