@@ -11,7 +11,7 @@ using UnityEngine.EventSystems;
 /// Builds the entire ShipButtlr game from scratch.
 /// Run via menu: ShipButtlr > Build All
 /// </summary>
-public static class GameSetup
+public static partial class GameSetup
 {
     // -------------------------------------------------------------------------
     // Entry point
@@ -88,6 +88,10 @@ public static class GameSetup
         EnsureFolder("Assets/Models", "Vulcano");
         EnsureFolder("Assets/Models", "AnchorBay");
         EnsureFolder("Assets/Models", "Dreadhold");
+        EnsureFolder("Assets/Models", "Kraken");
+        EnsureFolder("Assets", "Config");
+        EnsureFolder("Assets", "Animations");
+        EnsureFolder("Assets/Animations", "Kraken");
     }
 
     static void EnsureFolder(string parent, string child)
@@ -152,6 +156,9 @@ public static class GameSetup
         bomb.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
         EditorUtility.SetDirty(bomb);
         dict["L6_Bomb"] = bomb;
+
+        // Level 7 — Kraken's Throne (GameSetup.Kraken.cs)
+        AddKrakenMaterials(dict);
         return dict;
     }
 
@@ -182,6 +189,31 @@ public static class GameSetup
     // 4. Explosion particle prefab
     // -------------------------------------------------------------------------
 
+    // Shared soft round particle material for the explosion / splash / lightning-burst prefabs.
+    // Must be a saved asset: a `new Material()` assigned to a prefab's renderer is not serialized,
+    // so the prefab ends up with no material and the particles render magenta.
+    static Material ParticleMaterial()
+    {
+        const string path = "Assets/Materials/ParticleUnlit.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat != null) return mat;
+        var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Particles/Standard Unlit");
+        mat = new Material(shader);
+        mat.SetFloat("_Surface", 1f);   // transparent, alpha blend
+        mat.SetFloat("_Blend", 0f);
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.SetOverrideTag("RenderType", "Transparent");
+        mat.renderQueue = 3000;
+        var tex = AssetDatabase.GetBuiltinExtraResource<Texture2D>("Default-Particle.psd");
+        if (tex != null) { mat.SetTexture("_BaseMap", tex); mat.mainTexture = tex; }
+        mat.SetColor("_BaseColor", Color.white);
+        AssetDatabase.CreateAsset(mat, path);
+        return mat;
+    }
+
     static GameObject CreateExplosionPrefab()
     {
         string path = "Assets/Prefabs/ExplosionEffect.prefab";
@@ -207,10 +239,7 @@ public static class GameSetup
 
         // Ensure renderer uses URP-compatible material
         var renderer = go.GetComponent<ParticleSystemRenderer>();
-        var particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-        if (particleShader == null) particleShader = Shader.Find("Particles/Standard Unlit");
-        if (particleShader != null)
-            renderer.material = new Material(particleShader);
+        renderer.sharedMaterial = ParticleMaterial();   // saved asset — an inline material is lost in the prefab (renders magenta)
 
         var prefab = SavePrefab(go, path);
         Object.DestroyImmediate(go);
@@ -253,9 +282,7 @@ public static class GameSetup
         shape.radiusThickness = 1f;
 
         var renderer = go.GetComponent<ParticleSystemRenderer>();
-        var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-        if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
-        if (shader != null) renderer.material = new Material(shader);
+        renderer.sharedMaterial = ParticleMaterial();   // saved asset — an inline material is lost in the prefab (renders magenta)
 
         var prefab = SavePrefab(go, path);
         Object.DestroyImmediate(go);
@@ -382,9 +409,7 @@ public static class GameSetup
         shape.radiusThickness = 1f;
 
         var renderer = go.GetComponent<ParticleSystemRenderer>();
-        var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-        if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
-        if (shader != null) renderer.material = new Material(shader);
+        renderer.sharedMaterial = ParticleMaterial();   // saved asset — an inline material is lost in the prefab (renders magenta)
 
         var prefab = SavePrefab(go, path);
         Object.DestroyImmediate(go);
@@ -456,7 +481,7 @@ public static class GameSetup
         string srcDir = System.IO.Path.Combine(projectRoot, "images");
         string dstDir = System.IO.Path.Combine(Application.dataPath, "Resources");
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5", "Level_6" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5", "Level_6", "Level_7" })
         {
             string src = System.IO.Path.Combine(srcDir, lvl + ".png");
             string dst = System.IO.Path.Combine(dstDir, lvl + ".png");
@@ -468,7 +493,7 @@ public static class GameSetup
 
         AssetDatabase.Refresh();
 
-        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5", "Level_6" })
+        foreach (string lvl in new[] { "Level_1", "Level_2", "Level_3", "Level_4", "Level_5", "Level_6", "Level_7" })
         {
             string assetPath = "Assets/Resources/" + lvl + ".png";
             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
@@ -501,6 +526,9 @@ public static class GameSetup
         string l6Dir = System.IO.Path.Combine(projectRoot, "3d", "level6");
         foreach (string n in DreadholdModels)
             ImportModel(System.IO.Path.Combine(l6Dir, n + ".fbx"), DreadholdDir + n + ".fbx", bakeAxis: true);
+
+        // Level 7 Kraken's Throne models (generated by Tools/Blender/build_kraken.py into 3d/level7)
+        ImportKrakenModels();
 
         if (!System.IO.File.Exists(src))
         {
@@ -883,6 +911,10 @@ public static class GameSetup
         cameraFollow.distance = 21.6f;  // 20% farther than previous 18
         cameraFollow.height   = 8.8f;
 
+        // Level 7: Kraken's Throne — two-phase boss encounter (GameSetup.Kraken.cs)
+        var islands7RootGO = new GameObject("Level7_KrakensThrone");
+        var krakenCtrl = BuildKrakensThrone(mats, islands7RootGO, playerShipGO, splashPrefab, explosionPrefab);
+
         // ----- HUD Canvas -----
         var hudGO    = new GameObject("HUDCanvas");
         var hudCanvas = hudGO.AddComponent<Canvas>();
@@ -908,6 +940,9 @@ public static class GameSetup
         splatRT.offsetMin = Vector2.zero;
         splatRT.offsetMax = Vector2.zero;
         var cameraSplat = splatGO.AddComponent<CameraSplat>();
+
+        // Level 7 kraken ink on the lens — second HUD child (below every HUD element)
+        krakenCtrl.inkSplat = BuildInkSplat(hudGO.transform);
         if (seagullPrefab != null)
         {
             var gullSpawner = islands6RootGO.AddComponent<SeagullSpawner>();
@@ -928,6 +963,9 @@ public static class GameSetup
             "ENEMY SHIP", new Color(1f, 0.3f, 0.3f),
             new Vector2(1f, 1f), new Vector2(1f, 1f),
             new Vector2(-240f, -70f), new Vector2(220f, 50f));
+
+        // Level 7 boss bar — top-centre under the objective text (hidden unless the kraken encounter runs)
+        krakenCtrl.hud = BuildBossHUD(hudGO.transform);
 
         // Wire health bars to ships
         playerShip.healthBar = playerHealthBar;
@@ -980,6 +1018,7 @@ public static class GameSetup
         gm.islands4Root  = islands4RootGO;
         gm.islands5Root  = islands5RootGO;
         gm.islands6Root  = islands6RootGO;
+        gm.islands7Root  = islands7RootGO;
         gm.botHPGroup    = botHealthBar.transform.parent.gameObject; // "BotHP" group
         gm.botShipPrefab = botShipPrefabGO;
         gm.cloudySkybox      = l4SkyboxMat;
@@ -1650,7 +1689,7 @@ public static class GameSetup
                 string n = shared[i].name;
                 foreach (var kv in mats)
                 {
-                    if (!kv.Key.StartsWith("L6_")) continue;
+                    if (!kv.Key.StartsWith("L6_") && !kv.Key.StartsWith("L7_")) continue;
                     if (n == kv.Key || n.StartsWith(kv.Key + ".") || n.StartsWith(kv.Key + " "))
                     {
                         shared[i] = kv.Value;
@@ -2347,6 +2386,18 @@ public static class GameSetup
         isle6RT.offsetMin = Vector2.zero;
         isle6RT.offsetMax = Vector2.zero;
 
+        // Island 7 — Kraken's Throne (locked until CurrentLevel >= 7)
+        // Island body on Level_7.png ≈ x 1225–1475, y 90–295 px of 1536×1024 (tentacles + spires, label excluded)
+        var isle7GO = new GameObject("Island7Button");
+        isle7GO.transform.SetParent(panel.transform, false);
+        isle7GO.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+        var isle7Btn = isle7GO.AddComponent<Button>();
+        var isle7RT  = isle7GO.GetComponent<RectTransform>();
+        isle7RT.anchorMin = new Vector2(0.80f, 0.71f);
+        isle7RT.anchorMax = new Vector2(0.96f, 0.91f);
+        isle7RT.offsetMin = Vector2.zero;
+        isle7RT.offsetMax = Vector2.zero;
+
         // Close button — top-right corner
         var closeBtnGO = MakeButton("CloseButton", panel.transform, "X");
         var closeRT    = closeBtnGO.GetComponent<RectTransform>();
@@ -2363,6 +2414,7 @@ public static class GameSetup
         script.island4Button = isle4Btn;
         script.island5Button = isle5Btn;
         script.island6Button = isle6Btn;
+        script.island7Button = isle7Btn;
 
         // Wire callbacks
         UnityEventTools.AddPersistentListener(isle1Btn.onClick, script.OnIsland1Clicked);
@@ -2371,6 +2423,7 @@ public static class GameSetup
         UnityEventTools.AddPersistentListener(isle4Btn.onClick, script.OnIsland4Clicked);
         UnityEventTools.AddPersistentListener(isle5Btn.onClick, script.OnIsland5Clicked);
         UnityEventTools.AddPersistentListener(isle6Btn.onClick, script.OnIsland6Clicked);
+        UnityEventTools.AddPersistentListener(isle7Btn.onClick, script.OnIsland7Clicked);
         UnityEventTools.AddPersistentListener(
             closeBtnGO.GetComponent<Button>().onClick,
             script.OnCloseMapClicked);

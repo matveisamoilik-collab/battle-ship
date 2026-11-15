@@ -1,0 +1,20 @@
+{
+  "fps": 30,
+  "clips": [
+    {
+      "name": "Jump",
+      "first": 0,
+      "last": 29,
+      "loop": false
+    },
+    {
+      "name": "Applaud",
+      "first": 30,
+      "last": 59,
+      "loop": true
+    }
+  ],
+  "meta": {
+    "height": 4.16
+  }
+}

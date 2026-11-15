@@ -1,17 +1,27 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Level 6: seagull droppings on the camera lens. A full-screen RawImage on the HUD canvas
-// (first sibling, so the HUD stays readable on top; raycastTarget off so it never eats taps).
+// Full-screen splat on the camera lens. A RawImage on the HUD canvas (among the first siblings,
+// so the HUD stays readable on top; raycastTarget off so it never eats taps).
+// Level 6: seagull droppings (the defaults below). Level 7: kraken ink (GameSetup sets the style
+// fields on the "InkSplat" instance and KrakenLevelConfig overrides coverage / hold / fade).
 // Every Splat() draws a fresh random splotch into a screen-aspect texture, sized by a search so
-// exactly CoverageTarget (45 %) of the screen is covered, keeps it fully opaque for HoldDuration,
-// then fades it out over FadeDuration.
+// exactly coverageTarget of the screen is covered, keeps it fully opaque for holdDuration, then
+// fades it out over fadeDuration. Pregenerate()/ShowCached() bake a few splats up front so a
+// hit during play costs no frame spike and no allocation.
 [RequireComponent(typeof(RawImage))]
 public class CameraSplat : MonoBehaviour
 {
-    public const float CoverageTarget = 0.45f;
-    public const float HoldDuration   = 3f;   // fully opaque
-    public const float FadeDuration   = 3f;   // then fades out
+    [Header("Style (defaults = Level 6 seagull dropping)")]
+    [Range(0.05f, 0.95f)] public float coverageTarget = 0.45f;
+    public float holdDuration  = 3f;   // fully opaque
+    public float fadeDuration  = 3f;   // then fades out
+    public Color coreColor     = new Color(0.98f, 0.97f, 0.92f);
+    public Color rimColor      = new Color(0.80f, 0.80f, 0.72f);
+    public Color streakColor   = new Color(0.60f, 0.62f, 0.48f);
+    public Color gritColor     = new Color(0.33f, 0.31f, 0.26f);
+    [Range(0f, 1f)] public float glossStrength = 0.85f;
+
     const float PopDuration = 0.12f;
     const int   TexWidth    = 320;
     const int   SearchWidth = 80;   // coarse grid used to find the size that hits the coverage target
@@ -19,9 +29,12 @@ public class CameraSplat : MonoBehaviour
     struct Circle  { public Vector2 c; public float r; }
     struct Capsule { public Vector2 a, b; public float r; }
 
-    RawImage  image;
-    Texture2D tex;
-    float     age = -1f;   // < 0 = hidden
+    RawImage    image;
+    Texture2D   tex;
+    Texture2D[] cache;
+    int         cacheCount;
+    int         lastCached = -1;
+    float       age = -1f;   // < 0 = hidden
 
     // Splotch shape, in units of "splat size" (scaled by s), relative to the centre
     float[]   lobeAmp = new float[3], lobePhase = new float[3];
@@ -43,28 +56,70 @@ public class CameraSplat : MonoBehaviour
     void OnDestroy()
     {
         if (tex != null) Destroy(tex);
+        if (cache != null)
+            foreach (var t in cache) if (t != null) Destroy(t);
+    }
+
+    // Bakes `count` random splats near the screen centre, one per frame (call at level start)
+    public void Pregenerate(int count)
+    {
+        if (count <= 0) return;
+        StartCoroutine(PregenerateRoutine(count));
+    }
+
+    System.Collections.IEnumerator PregenerateRoutine(int count)
+    {
+        cache = new Texture2D[count];
+        cacheCount = 0;
+        for (int i = 0; i < count; i++)
+        {
+            cache[i] = Draw(new Vector2(Random.Range(0.4f, 0.6f), Random.Range(0.4f, 0.6f)), null);
+            cacheCount = i + 1;
+            yield return null;
+        }
+    }
+
+    // Shows one of the pre-baked splats (never the same one twice in a row); falls back to Splat()
+    public void ShowCached()
+    {
+        if (cacheCount == 0) { Splat(new Vector2(0.5f, 0.5f)); return; }
+        int i = Random.Range(0, cacheCount);
+        if (cacheCount > 1 && i == lastCached) i = (i + 1) % cacheCount;
+        lastCached = i;
+        Show(cache[i]);
     }
 
     // viewport: where the dropping hit the lens (0..1, 0..1)
     public void Splat(Vector2 viewport)
     {
+        tex = Draw(viewport, tex);
+        Show(tex);
+    }
+
+    void Show(Texture2D t)
+    {
+        image.texture = t;
+        image.color   = Color.white;
+        image.enabled = true;
+        age = 0f;
+    }
+
+    // Draws a fresh random splat centred at viewport into target (re-created if the size changed)
+    Texture2D Draw(Vector2 viewport, Texture2D target)
+    {
         aspect = Screen.height > 0 ? Mathf.Clamp((float)Screen.width / Screen.height, 1f, 3f) : 16f / 9f;
         int w = TexWidth, h = Mathf.Max(32, Mathf.RoundToInt(TexWidth / aspect));
-        if (tex == null || tex.width != w || tex.height != h)
+        if (target == null || target.width != w || target.height != h)
         {
-            if (tex != null) Destroy(tex);
-            tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            if (target != null) Destroy(target);
+            target = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
         }
 
         centre = new Vector2(viewport.x * aspect, viewport.y);
         RandomShape();
         float s = FindScale();
-        Paint(s);
-
-        image.texture = tex;
-        image.color   = Color.white;
-        image.enabled = true;
-        age = 0f;
+        Paint(target, s);
+        return target;
     }
 
     void Update()
@@ -75,7 +130,7 @@ public class CameraSplat : MonoBehaviour
         float pop = Mathf.Clamp01(age / PopDuration);
         transform.localScale = Vector3.one * Mathf.Lerp(1.12f, 1f, 1f - (1f - pop) * (1f - pop));
 
-        float a = 1f - Mathf.Clamp01((age - HoldDuration) / FadeDuration);
+        float a = 1f - Mathf.Clamp01((age - holdDuration) / Mathf.Max(0.01f, fadeDuration));
         image.color = new Color(1f, 1f, 1f, a);
         if (a <= 0f)
         {
@@ -164,27 +219,27 @@ public class CameraSplat : MonoBehaviour
         return (float)inside / (w * h);
     }
 
-    // Binary search for the splat size whose on-screen coverage is CoverageTarget
+    // Binary search for the splat size whose on-screen coverage is coverageTarget
     float FindScale()
     {
-        float lo = 0.05f, hi = 1.5f;
-        for (int i = 0; i < 12; i++)
+        float lo = 0.05f, hi = 3f;
+        for (int i = 0; i < 13; i++)
         {
             float mid = 0.5f * (lo + hi);
-            if (Coverage(mid, SearchWidth) < CoverageTarget) lo = mid; else hi = mid;
+            if (Coverage(mid, SearchWidth) < coverageTarget) lo = mid; else hi = mid;
         }
         return 0.5f * (lo + hi);
     }
 
-    void Paint(float s)
+    void Paint(Texture2D tex, float s)
     {
         int w = tex.width, h = tex.height;
         var px = new Color32[w * h];
         float pxSize = 1f / h;   // one texel in normalised units
-        var white  = new Color(0.98f, 0.97f, 0.92f);
-        var rim    = new Color(0.80f, 0.80f, 0.72f);
-        var green  = new Color(0.60f, 0.62f, 0.48f);
-        var grit   = new Color(0.33f, 0.31f, 0.26f);
+        var white  = coreColor;
+        var rim    = rimColor;
+        var green  = streakColor;
+        var grit   = gritColor;
         Vector2 gloss = centre + new Vector2(-0.3f, 0.32f) * s;
         int inside = 0;
 
@@ -206,7 +261,7 @@ public class CameraSplat : MonoBehaviour
                 float g = Mathf.PerlinNoise(noiseSeed * 1.7f + p.x * 55f, 31f + p.y * 55f);
                 if (g > 0.78f && depth > 0.15f) c = Color.Lerp(c, grit, Mathf.Clamp01((g - 0.78f) * 8f));
                 float gd = (p - gloss).magnitude / (0.22f * s);
-                if (gd < 1f) c = Color.Lerp(c, Color.white, (1f - gd) * 0.85f);
+                if (gd < 1f) c = Color.Lerp(c, Color.white, (1f - gd) * glossStrength);
 
                 c.a = alpha;
                 px[y * w + x] = c;

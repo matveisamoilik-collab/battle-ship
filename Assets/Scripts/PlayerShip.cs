@@ -55,6 +55,54 @@ public class PlayerShip : MonoBehaviour
         PullCrashed = false;
     }
 
+    // Level 7 hooks (BossEncounterController): circular arena clamp, whirlpool drift, knockback
+    private bool    hasArena;
+    private Vector3 arenaCentre;
+    private float   arenaRadius;
+    private float   arenaCurrentRadius;   // eases down to arenaRadius when the clamp starts with the ship outside
+    private const float ArenaReturnSpeed = 14f;
+    private Vector3 externalDrift;
+    private Vector3 knockVelocity;
+    private float   knockTimeLeft;
+    private float   knockDuration;
+
+    public float CurrentHP => currentHP;
+    public float MaxHP     => maxHP;
+
+    // Keeps the ship centre within radius of centre (XZ), applied after every movement step
+    public void SetArenaConstraint(Vector3 centre, float radius)
+    {
+        Vector3 c = new Vector3(centre.x, 0f, centre.z);
+        if (!hasArena)
+        {
+            // Ship dragged outside (e.g. by the whirlpool): shrink the wall gently instead of snapping
+            Vector3 p = transform.position; p.y = 0f;
+            arenaCurrentRadius = Mathf.Max(radius, Vector3.Distance(p, c));
+        }
+        hasArena    = true;
+        arenaCentre = c;
+        arenaRadius = radius;
+    }
+
+    public void ClearArenaConstraint() => hasArena = false;
+
+    // World-space velocity added to the ship every frame (e.g. a whirlpool pull); Vector3.zero clears it
+    public void SetExternalDrift(Vector3 velocity)
+    {
+        velocity.y    = 0f;
+        externalDrift = velocity;
+    }
+
+    // Pushes the ship `distance` units along dir over `duration` seconds, easing out
+    public void ApplyKnockback(Vector3 dir, float distance, float duration = 0.3f)
+    {
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f || duration <= 0f) return;
+        knockDuration = duration;
+        knockTimeLeft = duration;
+        knockVelocity = dir.normalized * (2f * distance / duration); // linear decay → area = distance
+    }
+
     void Start()
     {
         currentHP = maxHP;
@@ -62,6 +110,12 @@ public class PlayerShip : MonoBehaviour
         islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
         RefreshEnemyList();
         ApplySelectedShip();
+    }
+
+    // Re-scan islands (Level 7: the throne's IslandData appears mid-level)
+    public void RefreshIslands()
+    {
+        islands = FindObjectsByType<IslandData>(FindObjectsSortMode.None);
     }
 
     void RefreshEnemyList()
@@ -210,8 +264,28 @@ public class PlayerShip : MonoBehaviour
             transform.position += transform.forward * forward * moveSpeed * Time.deltaTime;
         }
 
+        // Level 7: whirlpool drift + knockback
+        transform.position += externalDrift * Time.deltaTime;
+        if (knockTimeLeft > 0f)
+        {
+            float k = knockTimeLeft / knockDuration;
+            transform.position += knockVelocity * k * Time.deltaTime;
+            knockTimeLeft -= Time.deltaTime;
+        }
+
         // Keep ship inside arena bounds and flat on water
         Vector3 pos = transform.position;
+        if (hasArena)
+        {
+            arenaCurrentRadius = Mathf.MoveTowards(arenaCurrentRadius, arenaRadius, ArenaReturnSpeed * Time.deltaTime);
+            Vector3 off = new Vector3(pos.x - arenaCentre.x, 0f, pos.z - arenaCentre.z);
+            if (off.sqrMagnitude > arenaCurrentRadius * arenaCurrentRadius)
+            {
+                off = off.normalized * arenaCurrentRadius;
+                pos.x = arenaCentre.x + off.x;
+                pos.z = arenaCentre.z + off.z;
+            }
+        }
         pos.x = Mathf.Clamp(pos.x, -95f, 95f);
         pos.z = Mathf.Clamp(pos.z, -95f, 95f);
         pos.y = 0f;
@@ -253,7 +327,7 @@ public class PlayerShip : MonoBehaviour
         bool touching = false;
         foreach (var island in islands)
         {
-            if (island == null) continue;
+            if (island == null || !island.isActiveAndEnabled) continue;   // L7 throne: disabled until risen
             float dx = pos.x - island.transform.position.x;
             float dz = pos.z - island.transform.position.z;
             float distSq = dx * dx + dz * dz;
@@ -310,8 +384,8 @@ public class PlayerShip : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
-        // Level 6: the island is already sinking — the level is won, nothing can hurt the player
-        if (GameManager.Instance != null && GameManager.Instance.Level6Finale) return;
+        // Level 6 finale / Level 7 victory: the level is won, nothing can hurt the player
+        if (GameManager.Instance != null && GameManager.Instance.PlayerInvulnerable) return;
         currentHP -= amount;
         currentHP = Mathf.Max(0f, currentHP);
         if (healthBar != null) healthBar.SetHealth(currentHP, maxHP);

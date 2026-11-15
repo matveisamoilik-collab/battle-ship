@@ -30,14 +30,15 @@ public class Torpedo : MonoBehaviour
     {
         if (!collisionEnabled) return;
 
-        // Level 6 pillars: only player torpedoes damage them; any torpedo explodes on them
-        CastlePillar pillar = collision.collider.GetComponentInParent<CastlePillar>();
-        if (pillar != null)
+        // Non-ship targets (L6 pillars, L7 kraken / sunfish / jellyfish / throne) handle the hit themselves
+        ITorpedoTarget target = collision.collider.GetComponentInParent<ITorpedoTarget>();
+        if (target != null)
         {
-            if (isPlayerTorpedo) pillar.TakeHit();
-            SoundManager.PlayAt("hit_island", transform.position, 0.8f);
-            SpawnExplosion();
-            Destroy(gameObject);
+            if (target.OnTorpedoHit(this))
+            {
+                SpawnExplosion();
+                Destroy(gameObject);
+            }
             return;
         }
 

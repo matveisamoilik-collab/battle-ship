@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
     public GameObject islands4Root;
     public GameObject islands5Root;
     public GameObject islands6Root;
+    public GameObject islands7Root;
     public Text levelText;
 
     [Header("Level 6")]
@@ -37,7 +38,7 @@ public class GameManager : MonoBehaviour
     public GameObject cloudsRoot;
     public Light      directionalLight;
 
-    public  const int   MaxLevel         = 6;
+    public  const int   MaxLevel         = 7;
     private const float SurvivalDuration = 90f;
     private const float SpawnInterval    = 18f;
 
@@ -52,6 +53,12 @@ public class GameManager : MonoBehaviour
     private bool  purpleSpawned;   // Level 5: red ship already split into purples
     private bool  level6Finale;    // Level 6: all pillars down, island sinking
     public  bool  Level6Finale => level6Finale;
+    private bool  invulnerable;    // Level 7: set during the victory sequence
+    public  bool  PlayerInvulnerable => level6Finale || invulnerable;
+    public  void  SetPlayerInvulnerable(bool on) => invulnerable = on;
+
+    // Level 7 player start: inside the kraken arena (the scene spawn at z = -60 is outside it)
+    public static readonly Vector3 Level7PlayerStart = new Vector3(0f, 0f, -24f);
 
     private const int   PurpleSplitCount  = 2;
     private const float PurpleSplitOffset = 4f; // sideways offset from the red ship's wreck
@@ -75,16 +82,26 @@ public class GameManager : MonoBehaviour
         if (islands4Root != null) islands4Root.SetActive(playingLevel == 4);
         if (islands5Root != null) islands5Root.SetActive(playingLevel == 5);
         if (islands6Root != null) islands6Root.SetActive(playingLevel == 6);
+        if (islands7Root != null) islands7Root.SetActive(playingLevel == 7);
         if (cloudsRoot   != null) cloudsRoot.SetActive(playingLevel == 4);
 
         // Level 6 starts with no enemy ship — only the castle cannons. Boats spawn from pillars.
-        if (playingLevel == 6)
+        // Level 7 is the kraken boss — no enemy ship either.
+        if (playingLevel == 6 || playingLevel == 7)
         {
             foreach (var bot in FindObjectsByType<BotShip>(FindObjectsSortMode.None))
             {
                 bot.gameObject.SetActive(false);
                 Destroy(bot.gameObject);
             }
+        }
+
+        // Level 7: move the player into the arena before CameraFollow.Start() snaps to it
+        if (playingLevel == 7)
+        {
+            var player = GameObject.FindWithTag("Player");
+            if (player != null)
+                player.transform.SetPositionAndRotation(Level7PlayerStart, Quaternion.identity);
         }
     }
 
@@ -120,7 +137,7 @@ public class GameManager : MonoBehaviour
             if (timerText != null) timerText.gameObject.SetActive(false);
         }
 
-        if (playingLevel == 6)
+        if (playingLevel == 6 || playingLevel == 7)
         {
             if (botHPGroup != null) botHPGroup.SetActive(false);
             if (objectiveText != null) objectiveText.gameObject.SetActive(true);
@@ -134,6 +151,13 @@ public class GameManager : MonoBehaviour
     {
         if (objectiveText != null)
             objectiveText.text = "PILLARS LEFT: " + pillarsLeft;
+    }
+
+    // Level 7 HUD: boss phase label in the same top-centre slot
+    public void SetObjectiveText(string text)
+    {
+        if (objectiveText != null)
+            objectiveText.text = text;
     }
 
     // Level 6: a small enemy gunboat appears where a pillar collapsed
@@ -162,6 +186,12 @@ public class GameManager : MonoBehaviour
     }
 
     public void Level6Cleared()
+    {
+        TriggerVictory();
+    }
+
+    // Level 7: kraken defeated and the dolphin has applauded
+    public void LevelCleared()
     {
         TriggerVictory();
     }
@@ -260,7 +290,7 @@ public class GameManager : MonoBehaviour
 
     public void BotDefeated(BotShip bot)
     {
-        if (playingLevel == 4 || playingLevel == 6)
+        if (playingLevel == 4 || playingLevel == 6 || playingLevel == 7)
         {
             // Level 4 bots respawn and Level 6 is won by sinking the island — just remove the ship
             if (bot != null) Destroy(bot.gameObject);

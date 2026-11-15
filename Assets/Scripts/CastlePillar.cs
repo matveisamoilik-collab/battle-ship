@@ -3,7 +3,7 @@ using UnityEngine;
 // Level 6: one of the three glowing stone pillars that hold up the Dreadhold island.
 // Player torpedoes call TakeHit(). Each of the first 4 hits cracks one drum (bottom → top),
 // turns its rune band dark and knocks off debris; the 5th hit topples the whole pillar.
-public class CastlePillar : MonoBehaviour
+public class CastlePillar : MonoBehaviour, ITorpedoTarget
 {
     public const int MaxHits = 5;
 
@@ -73,6 +73,14 @@ public class CastlePillar : MonoBehaviour
             marker.localPosition = markerBase + Vector3.up * Mathf.Sin(t * 2.5f) * 0.5f;
             marker.Rotate(Vector3.up, 90f * Time.deltaTime, Space.World);
         }
+    }
+
+    // Only player torpedoes damage pillars; any torpedo explodes on them
+    public bool OnTorpedoHit(Torpedo torpedo)
+    {
+        if (torpedo.isPlayerTorpedo) TakeHit();
+        SoundManager.PlayAt("hit_island", torpedo.transform.position, 0.8f);
+        return true;
     }
 
     public void TakeHit()

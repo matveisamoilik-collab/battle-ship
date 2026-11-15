@@ -1,0 +1,54 @@
+{
+  "fps": 30,
+  "clips": [
+    {
+      "name": "Idle",
+      "first": 0,
+      "last": 59,
+      "loop": true
+    },
+    {
+      "name": "Rise",
+      "first": 60,
+      "last": 95,
+      "loop": false
+    },
+    {
+      "name": "Windup",
+      "first": 96,
+      "last": 135,
+      "loop": true
+    },
+    {
+      "name": "Slam",
+      "first": 136,
+      "last": 145,
+      "loop": false
+    },
+    {
+      "name": "Recover",
+      "first": 146,
+      "last": 179,
+      "loop": false
+    },
+    {
+      "name": "Throw",
+      "first": 180,
+      "last": 209,
+      "loop": false
+    },
+    {
+      "name": "Sink",
+      "first": 210,
+      "last": 239,
+      "loop": false
+    }
+  ],
+  "meta": {
+    "slamReach": 35.97,
+    "slamImpactTime": 0.3,
+    "throwReleaseTime": 0.5,
+    "length": 36.0,
+    "tipBone": "T8"
+  }
+}
