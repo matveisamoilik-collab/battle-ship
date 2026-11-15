@@ -1,13 +1,27 @@
 ---
 name: release
 description: Cut a ShipWar Android release end to end. Pre-flight checks, Level 7 smoke test, signed AAB build (with antivirus retry), signature/version verification, Google Play upload, track check, version commit + v<version> tag + push. Use only when the user explicitly asks to release / publish / ship a new build.
-argument-hint: "[versionName, e.g. 0.9.1] [track: internal|alpha|beta|production]"
+argument-hint: "[version e.g. 0.9.1] [internal|alpha|beta|production]  (both optional)"
 disable-model-invocation: true
 ---
 
 # Release ShipWar
 
-Arguments: `$ARGUMENTS`: optional version name (e.g. `0.9.1`) and track (default `internal`).
+Arguments: `$ARGUMENTS`. Both parts are **optional** and can come in any order:
+
+| Usage | Version | Track |
+|---|---|---|
+| `/release` | auto: patch bump of the current `bundleVersion` (0.9.0 → 0.9.1) | `internal` |
+| `/release 0.10.0` | `0.10.0` | `internal` |
+| `/release beta` | auto patch bump | `beta` |
+| `/release 1.0.0 production` | `1.0.0` | `production` |
+
+Parsing rules:
+- A token matching `^v?\d+\.\d+(\.\d+)?$` is the version name. Strip a leading `v`, and turn `1.2` into `1.2.0`.
+- One of `internal | alpha | beta | production` is the track. Any other token: stop and ask.
+- A version you were given must be **greater** than the current `bundleVersion` (semver compare). Its `v<name>` tag must not already exist. Otherwise stop and ask.
+- With no version given, use the auto patch bump and show it in the step 1.5 confirmation, so the user can still change it there. Don't ask a separate question.
+- The versionCode is never an argument. It is always computed (step 1.4).
 
 Fixed facts (see also `CLAUDE.md` → batch mode / Signed Android AAB build):
 
@@ -33,7 +47,7 @@ Never print, log or commit the keystore passwords or the service-account key. Un
    - Current: `bundleVersion` / `AndroidBundleVersionCode` in `ProjectSettings/ProjectSettings.asset`.
    - Play: `C:\project\.playvenv\Scripts\python.exe -I Tools/upload_play.py --key C:/project/play-service-account.json --show --track <track>` prints the track and **max versionCode on any track**.
    - New versionCode = max(current, Play max) + 1.
-   - New versionName = the argument. If none was given, propose a patch bump (0.9.0 → 0.9.1) and ask the user (offer patch / minor).
+   - New versionName = the version argument if one was given; otherwise the auto patch bump (see *Arguments*).
    - Make sure the tag `v<versionName>` doesn't already exist (`git tag -l`, `git ls-remote --tags origin`).
 5. **Release notes**: draft one or two short English lines from `git log <last v-tag>..HEAD --oneline` and show them to the user with the version/track summary. **Get explicit confirmation before building/uploading.** A production track needs a separate, explicit yes.
 
