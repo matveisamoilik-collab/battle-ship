@@ -24,7 +24,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"FreeBoxes"` | int | 0 | Free loot boxes left (granted by `10box`; spent before coins) |
 | `"Promo_10box"` | int | 0 | 1 = `10box` already redeemed |
 | `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–7 (`GameManager.MaxLevel = 7`) |
-| `"Language"` | string | device language | UI language: `"en"`, `"ru"` or `"pl"` (managed by `Loc`) |
+| `"Language"` | string | device language | UI language: `"en"`, `"ru"`, `"pl"` or `"vot"` (managed by `Loc`) |
 
 ## Development Workflow
 
@@ -362,14 +362,15 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 ### Adding New Islands
 Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int treeCount, mats, Transform parent = null)`. Each island root gets an `IslandData` component (runtime data) and the `"Island"` tag. All calls in `BuildGameScene()` pass `islandsRootGO.transform` as the parent so the levels system can toggle them. To add an island: add a `CreateIsland(...)` call in `BuildGameScene()` with `islandsRootGO.transform` as the parent — no other changes needed.
 
-### Localization (EN / RU / PL)
+### Localization (EN / RU / PL / Votic)
 
-`Assets/Scripts/Localization.cs` — static `Loc` class. **Keys are the English strings**; the table in the static constructor maps each key to Russian and Polish (`Add(en, ru, pl)`).
+`Assets/Scripts/Localization.cs` — static `Loc` class. **Keys are the English strings**; the table in the static constructor maps each key to Russian and Polish (`Add(en, ru, pl)`); Votic lines are added separately in `AddVotic()` (`Vo(en, vot)`, a missing one falls back to English).
+- **Votic (`vot`) is an unverified draft** written without a speaker (Finnic roots + Russian loans). Have it checked against the *Vadja keele sõnaraamat* or by a Votic speaker before relying on it. It is never chosen automatically (no `SystemLanguage` value), only via the selector.
 - `Loc.T(key)` translates a literal, `Loc.F(formatKey, args)` translates a format string (`"COINS: {0}"`, `"LEVEL: {0}"` …). Every string that code writes to a `Text` must go through one of them.
 - Scene texts built by `GameSetup` stay English in the scene. On every scene load and on every language switch, `Loc` rewrites every `Text` (incl. inactive) whose text is a known string in **any** language, so no Build All is needed. It also turns on best fit (`Loc.Fit`, down to half size) so longer translations shrink instead of overflowing. Two keys must never share a translation (a `[Loc]` warning is logged).
 - Language: PlayerPrefs `"Language"`; on first launch it follows `Application.systemLanguage` (Russian / Belarusian / Ukrainian → RU, Polish → PL, otherwise EN). `Loc.Set(lang)` saves, retranslates and raises `Loc.Changed` (`MainMenu` refreshes coins / level / shop, `LanguageSelector` its highlight).
-- `LanguageSelector.cs`: EN / RU / PL buttons in the top-right of the main menu, built at runtime by `MainMenu.Start()` and placed right after `CoinText` so the shop / map panels cover them. The language can only be changed in the main menu.
-- **Adding UI text:** add an `Add("ENGLISH", "РУССКИЙ", "POLSKI")` line and use `Loc.T` / `Loc.F` in code. Map images (`Assets/Resources/Level_*.png`) have English island names baked in and are not translated; debug buttons (`DBG`, F-keys) stay English.
+- `LanguageSelector.cs`: EN / RU / PL / VOT buttons in the top-right of the main menu, built at runtime by `MainMenu.Start()` and placed right after `CoinText` so the shop / map panels cover them. The language can only be changed in the main menu.
+- **Adding UI text:** add an `Add("ENGLISH", "РУССКИЙ", "POLSKI")` line plus a `Vo("ENGLISH", "VAĐĐA")` line and use `Loc.T` / `Loc.F` in code. Map images (`Assets/Resources/Level_*.png`) have English island names baked in and are not translated; debug buttons (`DBG`, F-keys) stay English.
 
 ### Sound
 

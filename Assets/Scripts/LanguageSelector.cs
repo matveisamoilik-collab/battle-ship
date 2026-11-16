@@ -1,10 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// EN / RU / PL buttons in the top-right corner of the main menu (built at runtime — no Build All needed).
+// EN / RU / PL / VOT buttons in the top-right corner of the main menu (built at runtime — no Build All needed).
 public class LanguageSelector : MonoBehaviour
 {
-    static readonly string[] Labels = { "EN", "RU", "PL" };
+    static readonly string[] Labels = { "EN", "RU", "PL", "VOT" };
     static readonly Color Normal   = new Color(0.2f, 0.4f, 0.8f, 1f);
     static readonly Color Selected = new Color(1f, 0.78f, 0.15f, 1f);
 
@@ -18,7 +18,7 @@ public class LanguageSelector : MonoBehaviour
         var rt = root.GetComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
         rt.anchoredPosition = new Vector2(-20f, -20f);
-        rt.sizeDelta        = new Vector2(3 * 100f + 2 * 10f, 64f);
+        rt.sizeDelta        = new Vector2(Labels.Length * 110f - 10f, 64f);
 
         var sel = root.AddComponent<LanguageSelector>();
         sel.backgrounds = new Image[Labels.Length];

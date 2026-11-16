@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// Game localization: English (source), Russian, Polish.
+// Game localization: English (source), Russian, Polish, Votic (draft — see AddVotic).
 //
 // Keys are the English strings themselves. Scene texts built by GameSetup keep their English text;
 // on every scene load (and on every language switch) all Text components whose text matches a key
@@ -12,19 +12,19 @@ using UnityEngine.UI;
 // per-Text component. Texts that code sets at runtime go through Loc.T(key) / Loc.F(formatKey, args)
 // and are refreshed by their owners on Loc.Changed.
 //
-// The selected language is stored in PlayerPrefs "Language" ("en" / "ru" / "pl"); on first launch
+// The selected language is stored in PlayerPrefs "Language" ("en" / "ru" / "pl" / "vot"); on first launch
 // it follows the device language (Russian / Belarusian / Ukrainian → ru, Polish → pl, else en).
 public static class Loc
 {
-    public enum Lang { EN = 0, RU = 1, PL = 2 }
+    public enum Lang { EN = 0, RU = 1, PL = 2, VO = 3 }
 
     public const string PrefsKey = "Language";
-    static readonly string[] Codes = { "en", "ru", "pl" };
+    static readonly string[] Codes = { "en", "ru", "pl", "vot" };
 
     public static Lang Current { get; private set; } = Lang.EN;
     public static event Action Changed;
 
-    // key (English) → { ru, pl }
+    // key (English) → { ru, pl, vot }  (a missing vot entry falls back to English)
     static readonly Dictionary<string, string[]> table = new Dictionary<string, string[]>();
     // any language's text → key (literal keys only, not format strings)
     static readonly Dictionary<string, string> reverse = new Dictionary<string, string>();
@@ -136,19 +136,147 @@ public static class Loc
             "FAZA 2 · DRUGA FALA! ZNISZCZ MEDUZY (POZOSTAŁO: {0}) - KRÓL MA TARCZĘ");
         Add("PHASE 2 · ATTACK THE KRAKEN KING!", "ФАЗА 2 · АТАКУЙТЕ КОРОЛЯ КРАКЕНОВ!", "FAZA 2 · ATAKUJ KRÓLA KRAKENÓW!");
         Add("THE KRAKEN KING IS DEFEATED!", "КОРОЛЬ КРАКЕНОВ ПОВЕРЖЕН!", "KRÓL KRAKENÓW POKONANY!");
+
+        AddVotic();
+    }
+
+    // ---- Votic (vađđa ceeli) ----
+    // DRAFT, NOT VERIFIED BY A SPEAKER. Votic is nearly extinct and poorly documented; these lines are a
+    // best-effort reconstruction (Finnic roots + Russian loans) and should be checked against the
+    // "Vadja keele sõnaraamat" (Institute of the Estonian Language) or by a Votic speaker.
+    static void AddVotic()
+    {
+        // Main menu
+        Vo("SEA BATTLE", "MERESÕTA");
+        Vo("PLAY", "MÄNGIÄ");
+        Vo("MAP", "KARTTA");
+        Vo("SHOP", "LAVKA");
+        Vo("QUIT", "VÄLJÄ");
+
+        // Shop
+        Vo("TO BUY", "MÜÜNNIS");
+        Vo("BOUGHT", "OSTETUD");
+        Vo("STATS", "TIEDOD");
+        Vo("LOOT BOX", "ARKKU");
+        Vo("BUY", "OSSAA");
+        Vo("SELECT", "VALITA");
+        Vo("SELL", "MÜÜÄ");
+        Vo("✓ SELECTED", "✓ VALITUD");
+        Vo("BLUE SHIP", "SININ LAIVA");
+        Vo("YELLOW SHIP", "KÕLTÕIN LAIVA");
+        Vo("YELLOW-RED SHIP", "KÕLTÕ-PUNNÕIN LAIVA");
+        Vo("WHITE SHIP", "VALKÕA LAIVA");
+        Vo("PIRAT SHIP", "MERIROSVO LAIVA");
+        Vo("SHARK SHIP", "AKULA-LAIVA");
+        Vo("PROMO CODE", "PROMOKOODI");
+        Vo("Enter code...", "Kirjuta koodi...");
+        Vo("REDEEM", "OTA VASTAA");
+
+        // Stats table
+        Vo("SHIP", "LAIVA");
+        Vo("SIZE", "SUURUZ");
+        Vo("HP", "VÄKI");
+        Vo("SPD", "KIIRUZ");
+        Vo("DMG", "KAHJO");
+        Vo("DELAY", "OOTUZ");
+        Vo("BLUE", "SININ");
+        Vo("YELLOW", "KÕLTÕIN");
+        Vo("YELLOW-RED", "KÕLTÕ-PUNNÕIN");
+        Vo("PIRATE", "MERIROSVO");
+        Vo("SHARK", "AKULA");
+        Vo("BLACK (BOT)", "MUSSA (BOTTI)");
+
+        // Loot box
+        Vo("SEA CHEST", "MERE ARKKU");
+        Vo("OPEN", "AVAA");
+        Vo("OPEN (FREE)", "AVAA (ILMAA)");
+        Vo("OPEN AGAIN (FREE)", "VIEL KERTA (ILMAA)");
+        Vo("OPEN AGAIN ({0})", "VIEL KERTA ({0})");
+        Vo("POSSIBLE DROPS", "MITÄ VOIB SAADA");
+        Vo("BOXES: {0}", "ARKUD: {0}");
+        Vo("YOU GOT:  {0}", "SAIT:  {0}");
+        Vo("{0} (OWNED) -> +{1} COINS", "{0} (ON JO) -> +{1} RAHAA");
+        Vo("OK", "ÜVÄ");
+
+        // Coins (numerals take the partitive: "10 rahaa")
+        Vo("COINS: {0}", "RAHAD: {0}");
+        Vo("{0} COINS", "{0} RAHAA");
+        Vo("+{0} COINS", "+{0} RAHAA");
+        foreach (int n in new[] { 10, 50, 65, 100, 150, 200, 250, 1000 })
+            Vo(n + " COINS", n + " RAHAA");
+
+        // Promo codes
+        Vo("Reset {0} code(s).", "Koodia nollattu: {0}.");
+        Vo("Nothing to reset.", "Eb ole mitä nollata.");
+        Vo("Level reset to 1.", "Tasõ nollattu: 1.");
+        Vo("Already used.", "Jo käütettü.");
+        Vo("Invalid code.", "Väärä koodi.");
+        Vo("+{0} FREE LOOT BOXES!", "+{0} ILMAIZTA ARKKUA!");
+        Vo("+{0} COINS + SHIP!", "+{0} RAHAA + LAIVA!");
+        Vo("+{0} COINS!", "+{0} RAHAA!");
+
+        // Game HUD
+        Vo("LEVEL: {0}", "TASÕ: {0}");
+        Vo("LEVEL: 1", "TASÕ: 1");
+        Vo("YOUR SHIP", "SIÄ LAIVA");
+        Vo("ENEMY SHIP", "VAINLAIZÕ LAIVA");
+        Vo("VICTORY!", "VÕITTO!");
+        Vo("DEFEATED", "KAOTUZ");
+        Vo("PLAY AGAIN", "MÄNGIÄ VIEL");
+        Vo("MAIN MENU", "PÄÄMENJU");
+        Vo("PILLARS LEFT: {0}", "SAMMASSÕ JÄLLÕ: {0}");
+        Vo("PILLARS LEFT: 3", "SAMMASSÕ JÄLLÕ: 3");
+
+        // Level 7
+        Vo("KRAKEN", "KRAKEN");
+        Vo("SUNFISH", "KUUKALA");
+        Vo("KRAKEN KING", "KRAKENI KUNINGAS");
+        Vo("PHASE 1 / 2", "FAASI 1 / 2");
+        Vo("PHASE 2 / 2", "FAASI 2 / 2");
+        Vo("KRAKEN'S THRONE", "KRAKENI TROONA");
+        Vo("PHASE 1 · DODGE THE TENTACLES  {0}:{1:00}", "FAASI 1 · VÄLTÄ LONKEROID  {0}:{1:00}");
+        Vo("THE TENTACLES SINK...", "LONKEROD VAJOVAD...");
+        Vo("PHASE 1 · ESCAPE THE WHIRLPOOL!", "FAASI 1 · PÄÄSE PÖÖRTEESSÄ!");
+        Vo("PHASE 1 · THE KRAKEN IS COMING - GET AWAY!", "FAASI 1 · KRAKEN TULOB - PAKKO!");
+        Vo("PHASE 1 · ATTACK THE KRAKEN!", "FAASI 1 · LÕÕ KRAKENIA!");
+        Vo("THE KRAKEN DIVES...", "KRAKEN SUKALTAB...");
+        Vo("THE KRAKEN SINKS...", "KRAKEN VAJOB...");
+        Vo("PHASE 2 · SINK THE SUNFISH", "FAASI 2 · UPOTA KUUKALA");
+        Vo("PHASE 2 · THE KRAKEN KING RISES!", "FAASI 2 · KRAKENI KUNINGAS NOUZOB!");
+        Vo("PHASE 2 · SINK THE JELLYFISH ({0} LEFT) - THE KING IS SHIELDED",
+           "FAASI 2 · UPOTA MEDUZAD ({0} JÄLLÕ) - KUNINGAS ON KILVÕ TAKAN");
+        Vo("PHASE 2 · SECOND WAVE! SINK THE JELLYFISH ({0} LEFT) - THE KING IS SHIELDED",
+           "FAASI 2 · TOIN AALTO! UPOTA MEDUZAD ({0} JÄLLÕ) - KUNINGAS ON KILVÕ TAKAN");
+        Vo("PHASE 2 · ATTACK THE KRAKEN KING!", "FAASI 2 · LÕÕ KRAKENI KUNINGASTA!");
+        Vo("THE KRAKEN KING IS DEFEATED!", "KRAKENI KUNINGAS ON VÕITETTU!");
     }
 
     static void Add(string en, string ru, string pl)
     {
-        table[en] = new[] { ru, pl };
-        if (en.Contains("{")) return; // format strings are never matched against scene texts
-        foreach (var s in new[] { en, ru, pl })
+        table[en] = new[] { ru, pl, null };
+        AddReverse(en, en);
+        AddReverse(ru, en);
+        AddReverse(pl, en);
+    }
+
+    static void Vo(string en, string vot)
+    {
+        if (!table.TryGetValue(en, out var tr))
         {
-            if (reverse.TryGetValue(s, out var other) && other != en)
-                Debug.LogWarning($"[Loc] \"{s}\" is the text of both \"{other}\" and \"{en}\"");
-            else
-                reverse[s] = en;
+            Debug.LogWarning($"[Loc] Votic line for unknown key \"{en}\"");
+            return;
         }
+        tr[2] = vot;
+        AddReverse(vot, en);
+    }
+
+    static void AddReverse(string text, string key)
+    {
+        if (key.Contains("{")) return; // format strings are never matched against scene texts
+        if (reverse.TryGetValue(text, out var other) && other != key)
+            Debug.LogWarning($"[Loc] \"{text}\" is the text of both \"{other}\" and \"{key}\"");
+        else
+            reverse[text] = key;
     }
 
     // ---- Lookup ----
@@ -156,7 +284,7 @@ public static class Loc
     public static string T(string key)
     {
         if (string.IsNullOrEmpty(key) || Current == Lang.EN) return key;
-        return table.TryGetValue(key, out var tr) ? tr[(int)Current - 1] : key;
+        return table.TryGetValue(key, out var tr) ? tr[(int)Current - 1] ?? key : key;
     }
 
     public static string F(string formatKey, params object[] args) => string.Format(T(formatKey), args);
