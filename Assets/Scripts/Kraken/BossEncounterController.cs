@@ -507,7 +507,7 @@ public class BossEncounterController : MonoBehaviour, IArcOwner
         if (sec != lastShownSecond)
         {
             lastShownSecond = sec;
-            Objective(string.Format("PHASE 1 · DODGE THE TENTACLES  {0}:{1:00}", sec / 60, sec % 60));
+            Objective(Loc.F("PHASE 1 · DODGE THE TENTACLES  {0}:{1:00}", sec / 60, sec % 60));
         }
 
         if (remaining > 0f)
@@ -710,8 +710,9 @@ public class BossEncounterController : MonoBehaviour, IArcOwner
         return n;
     }
 
-    void UpdateJellyObjective() => Objective((secondWaveDone ? "PHASE 2 · SECOND WAVE! SINK THE JELLYFISH (" : "PHASE 2 · SINK THE JELLYFISH (")
-                                             + AliveJellyfish() + " LEFT) - THE KING IS SHIELDED");
+    void UpdateJellyObjective() => Objective(Loc.F(secondWaveDone
+        ? "PHASE 2 · SECOND WAVE! SINK THE JELLYFISH ({0} LEFT) - THE KING IS SHIELDED"
+        : "PHASE 2 · SINK THE JELLYFISH ({0} LEFT) - THE KING IS SHIELDED", AliveJellyfish()));
 
     public void OnJellyfishKilled(Jellyfish j)
     {
@@ -799,7 +800,8 @@ public class BossEncounterController : MonoBehaviour, IArcOwner
         else    playerShip.ClearArenaConstraint();
     }
 
-    void Objective(string text) => GameManager.Instance?.SetObjectiveText(text);
+    // Static sentences are translated here; formatted ones arrive already translated (Loc.T leaves them as they are).
+    void Objective(string text) => GameManager.Instance?.SetObjectiveText(Loc.T(text));
 
     void ClearProjectilesAndZones()
     {

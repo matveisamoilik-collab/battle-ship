@@ -109,7 +109,7 @@ public class GameManager : MonoBehaviour
     {
         UpdateCoinsText();
         if (levelText != null)
-            levelText.text = "LEVEL: " + playingLevel;
+            levelText.text = Loc.F("LEVEL: {0}", playingLevel);
 
         if (playingLevel == 4)
         {
@@ -150,7 +150,7 @@ public class GameManager : MonoBehaviour
     public void SetObjective(int pillarsLeft)
     {
         if (objectiveText != null)
-            objectiveText.text = "PILLARS LEFT: " + pillarsLeft;
+            objectiveText.text = Loc.F("PILLARS LEFT: {0}", pillarsLeft);
     }
 
     // Level 7 HUD: boss phase label in the same top-centre slot
@@ -269,13 +269,13 @@ public class GameManager : MonoBehaviour
         }
 
         SoundManager.Play("victory", 0.9f, 0f);
-        ShowEndPanel("VICTORY!");
+        ShowEndPanel(Loc.T("VICTORY!"));
     }
 
     void UpdateCoinsText()
     {
         if (coinsText != null && CoinManager.Instance != null)
-            coinsText.text = "COINS: " + CoinManager.Instance.Coins;
+            coinsText.text = Loc.F("COINS: {0}", CoinManager.Instance.Coins);
     }
 
     public void PlayerDefeated()
@@ -285,7 +285,7 @@ public class GameManager : MonoBehaviour
         CoinManager.Instance?.AddCoins(1);
         UpdateCoinsText();
         SoundManager.Play("defeat", 0.9f, 0f);
-        ShowEndPanel("DEFEATED");
+        ShowEndPanel(Loc.T("DEFEATED"));
     }
 
     public void BotDefeated(BotShip bot)

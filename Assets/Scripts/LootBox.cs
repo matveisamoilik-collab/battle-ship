@@ -92,12 +92,12 @@ public class LootBox : MonoBehaviour
         {
             openButton.interactable = !spinning && CanOpen;
             var label = openButton.GetComponentInChildren<Text>();
-            if (label != null) label.text = free > 0 ? "OPEN (FREE)" : "OPEN";
+            if (label != null) { label.text = Loc.T(free > 0 ? "OPEN (FREE)" : "OPEN"); Loc.Fit(label); }
         }
         EnsureCounter();
         if (counterText != null)
         {
-            counterText.text  = "BOXES: " + free;
+            counterText.text  = Loc.F("BOXES: {0}", free);
             counterText.color = free > 0 ? Color.white : new Color(1f, 1f, 1f, 0.45f);
         }
     }
@@ -144,24 +144,24 @@ public class LootBox : MonoBehaviour
                 if (PlayerPrefs.GetInt("YellowShipOwned", 0) == 1) { coinsGranted = YellowDuplicateCoins; break; }
                 PlayerPrefs.SetInt("YellowShipOwned", 1);
                 PlayerPrefs.Save();
-                return "YELLOW SHIP!";
+                return Loc.T("YELLOW SHIP") + "!";
             case DropKind.PiratShip:
                 if (PlayerPrefs.GetInt("PiratShipOwned", 0) == 1) { coinsGranted = PiratDuplicateCoins; break; }
                 PlayerPrefs.SetInt("PiratShipOwned", 1);
                 PlayerPrefs.Save();
-                return "PIRAT SHIP!";
+                return Loc.T("PIRAT SHIP") + "!";
             case DropKind.SharkShip:
                 if (PlayerPrefs.GetInt("SharkShipOwned", 0) == 1) { coinsGranted = SharkDuplicateCoins; break; }
                 PlayerPrefs.SetInt("SharkShipOwned", 1);
                 PlayerPrefs.Save();
-                return "SHARK SHIP!";
+                return Loc.T("SHARK SHIP") + "!";
             default:
                 coinsGranted = drop.coins;
                 CoinManager.Instance.AddCoins(coinsGranted, false);
-                return "+" + coinsGranted + " COINS";
+                return Loc.F("+{0} COINS", coinsGranted);
         }
         CoinManager.Instance.AddCoins(coinsGranted, false);
-        return drop.name + " (OWNED) -> +" + coinsGranted + " COINS";
+        return Loc.F("{0} (OWNED) -> +{1} COINS", Loc.T(drop.name), coinsGranted);
     }
 
     // ---- Animation -----------------------------------------------------------------------------
@@ -226,7 +226,7 @@ public class LootBox : MonoBehaviour
         bool big = win.chance <= 10f || win.kind != DropKind.Coins;
         SoundManager.Play(big ? "victory" : "coins", big ? 0.8f : 0.9f, 0f);
         resultText.color = win.rarity;
-        resultText.text  = "YOU GOT:  " + label;
+        resultText.text  = Loc.F("YOU GOT:  {0}", label);
         SetCoinsText(CoinManager.Instance.Coins);
 
         float p = 0f;
@@ -244,14 +244,14 @@ public class LootBox : MonoBehaviour
         againButton.gameObject.SetActive(true);
         againButton.interactable = CanOpen;
         againButton.GetComponentInChildren<Text>().text =
-            FreeBoxes > 0 ? "OPEN AGAIN (FREE)" : "OPEN AGAIN (" + Price + ")";
+            FreeBoxes > 0 ? Loc.T("OPEN AGAIN (FREE)") : Loc.F("OPEN AGAIN ({0})", Price);
         if (menu != null) menu.RefreshShopUI();
         RefreshButton();
     }
 
     void SetCoinsText(int coins)
     {
-        if (menu != null && menu.coinsText != null) menu.coinsText.text = "COINS: " + coins;
+        if (menu != null && menu.coinsText != null) menu.coinsText.text = Loc.F("COINS: {0}", coins);
     }
 
     void CloseOverlay()
@@ -278,7 +278,7 @@ public class LootBox : MonoBehaviour
         overlay = NewUI("LootBoxOverlay", transform, Vector2.zero, Vector2.one);
         overlay.AddComponent<Image>().color = new Color(0.02f, 0.02f, 0.06f, 0.97f); // also blocks clicks behind
 
-        var title = NewText("Title", overlay.transform, "SEA CHEST", 44, Color.white,
+        var title = NewText("Title", overlay.transform, Loc.T("SEA CHEST"), 44, Color.white,
                             new Vector2(0f, 0.80f), new Vector2(1f, 0.95f));
         title.fontStyle = FontStyle.Bold;
 
@@ -312,9 +312,9 @@ public class LootBox : MonoBehaviour
                              new Vector2(0f, 0.24f), new Vector2(1f, 0.38f));
         resultText.fontStyle = FontStyle.Bold;
 
-        okButton = NewButton("OkButton", overlay.transform, "OK",
+        okButton = NewButton("OkButton", overlay.transform, Loc.T("OK"),
                              new Vector2(0.18f, 0.06f), new Vector2(0.48f, 0.19f), CloseOverlay);
-        againButton = NewButton("OpenAgainButton", overlay.transform, "OPEN AGAIN (" + Price + ")",
+        againButton = NewButton("OpenAgainButton", overlay.transform, Loc.F("OPEN AGAIN ({0})", Price),
                                 new Vector2(0.52f, 0.06f), new Vector2(0.82f, 0.19f), OpenAgain)
                       .GetComponent<Button>();
     }
@@ -365,8 +365,10 @@ public class LootBox : MonoBehaviour
             }
         }
 
-        NewText("Name", go.transform, drop.name, 22, Color.white, new Vector2(0f, 0.10f), new Vector2(1f, 0.30f))
-            .fontStyle = FontStyle.Bold;
+        var nameText = NewText("Name", go.transform, Loc.T(drop.name), 22, Color.white, new Vector2(0.03f, 0.08f), new Vector2(0.97f, 0.32f));
+        nameText.fontStyle          = FontStyle.Bold;
+        nameText.horizontalOverflow = HorizontalWrapMode.Wrap; // long translations wrap / shrink inside the tile
+        Loc.Fit(nameText);
         return rt;
     }
 
@@ -418,7 +420,9 @@ public class LootBox : MonoBehaviour
         btn.colors = c;
         btn.onClick.AddListener(onClick);
         btn.onClick.AddListener(() => SoundManager.Play("click", 0.8f, 0f)); // runtime buttons miss SoundManager's scene hook
-        NewText("Text", go.transform, label, 28, Color.white, Vector2.zero, Vector2.one);
+        var txt = NewText("Text", go.transform, label, 28, Color.white, Vector2.zero, Vector2.one);
+        txt.horizontalOverflow = HorizontalWrapMode.Wrap;
+        Loc.Fit(txt);
         return go;
     }
 }

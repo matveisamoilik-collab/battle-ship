@@ -77,9 +77,34 @@ public class MainMenu : MonoBehaviour
     void Start()
     {
         levelToPlay = -1;
+        BuildLanguageSelector();
         RefreshShopUI();
+        RefreshLevelText();
+    }
+
+    void OnEnable()  { Loc.Changed += OnLanguageChanged; }
+    void OnDisable() { Loc.Changed -= OnLanguageChanged; }
+
+    void OnLanguageChanged()
+    {
+        RefreshShopUI();
+        RefreshLevelText();
+        if (promoFeedbackText != null) promoFeedbackText.text = ""; // old message is in the previous language
+    }
+
+    void RefreshLevelText()
+    {
         if (levelText != null)
-            levelText.text = "LEVEL: " + PlayerPrefs.GetInt("CurrentLevel", 1);
+            levelText.text = Loc.F("LEVEL: {0}", PlayerPrefs.GetInt("CurrentLevel", 1));
+    }
+
+    // EN / RU / PL in the top-right corner; placed right after the coin text so the shop / map panels cover it.
+    void BuildLanguageSelector()
+    {
+        if (coinsText == null) return;
+        var canvas = coinsText.canvas != null ? coinsText.canvas.transform : coinsText.transform.parent;
+        var sel = LanguageSelector.Build(canvas);
+        sel.transform.SetSiblingIndex(coinsText.transform.GetSiblingIndex() + 1);
     }
 
     public void OnPlayClicked()
@@ -149,7 +174,7 @@ public class MainMenu : MonoBehaviour
         if (yellowShipBoughtCard != null) yellowShipBoughtCard.SetActive(yellowOwned);
 
         if (coinsText != null && CoinManager.Instance != null)
-            coinsText.text = "COINS: " + CoinManager.Instance.Coins;
+            coinsText.text = Loc.F("COINS: {0}", CoinManager.Instance.Coins);
         if (lootBox != null) lootBox.RefreshButton();
 
         if (buyYellowShipButton != null)
@@ -351,7 +376,7 @@ public class MainMenu : MonoBehaviour
             PlayerPrefs.Save();
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.cyan;
-            promoFeedbackText.text  = refunded > 0 ? $"Reset {refunded} code(s)." : "Nothing to reset.";
+            promoFeedbackText.text  = refunded > 0 ? Loc.F("Reset {0} code(s).", refunded) : Loc.T("Nothing to reset.");
             RefreshShopUI();
             return;
         }
@@ -362,9 +387,8 @@ public class MainMenu : MonoBehaviour
             PlayerPrefs.Save();
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.cyan;
-            promoFeedbackText.text  = "Level reset to 1.";
-            if (levelText != null)
-                levelText.text = "LEVEL: 1";
+            promoFeedbackText.text  = Loc.T("Level reset to 1.");
+            RefreshLevelText();
             return;
         }
 
@@ -373,7 +397,7 @@ public class MainMenu : MonoBehaviour
             if (PlayerPrefs.GetInt(FreeBoxCodeKey, 0) == 1)
             {
                 promoFeedbackText.color = new Color(1f, 0.6f, 0f);
-                promoFeedbackText.text  = "Already used.";
+                promoFeedbackText.text  = Loc.T("Already used.");
                 return;
             }
             PlayerPrefs.SetInt(FreeBoxCodeKey, 1);
@@ -381,7 +405,7 @@ public class MainMenu : MonoBehaviour
             SoundManager.Play("coins");
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.green;
-            promoFeedbackText.text  = $"+{FreeBoxCodeAmount} FREE LOOT BOXES!";
+            promoFeedbackText.text  = Loc.F("+{0} FREE LOOT BOXES!", FreeBoxCodeAmount);
             RefreshShopUI();
             return;
         }
@@ -390,7 +414,7 @@ public class MainMenu : MonoBehaviour
         if (!isValid)
         {
             promoFeedbackText.color = Color.red;
-            promoFeedbackText.text  = "Invalid code.";
+            promoFeedbackText.text  = Loc.T("Invalid code.");
             return;
         }
 
@@ -399,7 +423,7 @@ public class MainMenu : MonoBehaviour
         if (PlayerPrefs.GetInt(prefsKey, 0) == 1)
         {
             promoFeedbackText.color = new Color(1f, 0.6f, 0f);
-            promoFeedbackText.text  = "Already used.";
+            promoFeedbackText.text  = Loc.T("Already used.");
             return;
         }
 
@@ -412,7 +436,7 @@ public class MainMenu : MonoBehaviour
             PlayerPrefs.Save();
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.green;
-            promoFeedbackText.text  = $"+{PromoCodeReward} COINS + SHIP!";
+            promoFeedbackText.text  = Loc.F("+{0} COINS + SHIP!", PromoCodeReward);
             RefreshShopUI();
             return;
         }
@@ -422,13 +446,13 @@ public class MainMenu : MonoBehaviour
             PlayerPrefs.Save();
             promoCodeInput.text     = "";
             promoFeedbackText.color = Color.green;
-            promoFeedbackText.text  = $"+{PromoCodeReward} COINS + SHIP!";
+            promoFeedbackText.text  = Loc.F("+{0} COINS + SHIP!", PromoCodeReward);
             RefreshShopUI();
             return;
         }
         promoCodeInput.text     = "";
         promoFeedbackText.color = Color.green;
-        promoFeedbackText.text  = $"+{reward} COINS!";
+        promoFeedbackText.text  = Loc.F("+{0} COINS!", reward);
         RefreshShopUI();
     }
 

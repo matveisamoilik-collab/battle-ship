@@ -22,8 +22,8 @@ public class BossHUD : MonoBehaviour
     public void Show(string bossName, string phase, float hp, float max, Color color)
     {
         gameObject.SetActive(true);
-        if (nameText  != null) nameText.text  = bossName;
-        if (phaseText != null) phaseText.text = phase;
+        if (nameText  != null) nameText.text  = Loc.T(bossName);
+        if (phaseText != null) phaseText.text = Loc.T(phase);
         baseColor = color;
         shielded  = false;
         SetHP(hp, max);
