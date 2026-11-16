@@ -144,17 +144,17 @@ public class LootBox : MonoBehaviour
                 if (PlayerPrefs.GetInt("YellowShipOwned", 0) == 1) { coinsGranted = YellowDuplicateCoins; break; }
                 PlayerPrefs.SetInt("YellowShipOwned", 1);
                 PlayerPrefs.Save();
-                return Loc.T("YELLOW SHIP") + "!";
+                return Loc.F("{0}!", Loc.T("YELLOW SHIP"));
             case DropKind.PiratShip:
                 if (PlayerPrefs.GetInt("PiratShipOwned", 0) == 1) { coinsGranted = PiratDuplicateCoins; break; }
                 PlayerPrefs.SetInt("PiratShipOwned", 1);
                 PlayerPrefs.Save();
-                return Loc.T("PIRAT SHIP") + "!";
+                return Loc.F("{0}!", Loc.T("PIRAT SHIP"));
             case DropKind.SharkShip:
                 if (PlayerPrefs.GetInt("SharkShipOwned", 0) == 1) { coinsGranted = SharkDuplicateCoins; break; }
                 PlayerPrefs.SetInt("SharkShipOwned", 1);
                 PlayerPrefs.Save();
-                return Loc.T("SHARK SHIP") + "!";
+                return Loc.F("{0}!", Loc.T("SHARK SHIP"));
             default:
                 coinsGranted = drop.coins;
                 CoinManager.Instance.AddCoins(coinsGranted, false);

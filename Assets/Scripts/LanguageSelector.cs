@@ -6,9 +6,16 @@ using UnityEngine.UI;
 // tapping anywhere else closes the menu. The globe is drawn in code (no image asset).
 public class LanguageSelector : MonoBehaviour
 {
-    // Shown in each language's own name, in the order of Loc.Lang.
-    static readonly string[] Names = { "ENGLISH", "РУССКИЙ", "POLSKI", "VAĐĐA (BETA)" };
-    static readonly string[] Codes = { "EN", "RU", "PL", "VOT" };
+    // Each language in its own name, indexed by Loc.Lang.
+    static readonly string[] Names =
+        { "ENGLISH", "РУССКИЙ", "POLSKI", "VAĐĐA (BETA)", "БЕЛАРУСКАЯ", "УКРАЇНСЬКА", "ESPAÑOL", "中文", ArabicText.Shape("العربية") };
+    static readonly string[] Codes = { "EN", "RU", "PL", "VOT", "BE", "UK", "ES", "ZH", "AR" };
+    // Order of the rows in the menu (Votic draft last).
+    static readonly Loc.Lang[] Order =
+    {
+        Loc.Lang.EN, Loc.Lang.ES, Loc.Lang.PL, Loc.Lang.RU, Loc.Lang.UK, Loc.Lang.BE,
+        Loc.Lang.ZH, Loc.Lang.AR, Loc.Lang.VO,
+    };
 
     static readonly Color ButtonColor = new Color(0.2f, 0.4f, 0.8f, 1f);
     static readonly Color MenuColor   = new Color(0.08f, 0.10f, 0.22f, 0.96f);
@@ -17,8 +24,8 @@ public class LanguageSelector : MonoBehaviour
 
     const float IconSize = 84f;
     const float RowW     = 300f;
-    const float RowH     = 64f;
-    const float Pad      = 8f;
+    const float RowH     = 56f;
+    const float Pad      = 6f;
 
     GameObject blocker;
     GameObject menu;
@@ -72,7 +79,7 @@ public class LanguageSelector : MonoBehaviour
         sel.codeBadge.fontStyle = FontStyle.Bold;
 
         // Dropdown menu under the globe
-        int n = Names.Length;
+        int n = Order.Length;
         sel.menu = NewUI("LanguageMenu", root.transform, Vector2.one, Vector2.one);
         var mrt = sel.menu.GetComponent<RectTransform>();
         mrt.pivot            = Vector2.one;
@@ -84,20 +91,20 @@ public class LanguageSelector : MonoBehaviour
         sel.rowTexts = new Text[n];
         for (int i = 0; i < n; i++)
         {
-            var row = NewUI("Lang_" + Codes[i], sel.menu.transform, new Vector2(0f, 1f), new Vector2(0f, 1f));
+            var lang = Order[i];
+            var row = NewUI("Lang_" + Codes[(int)lang], sel.menu.transform, new Vector2(0f, 1f), new Vector2(0f, 1f));
             var rrt = row.GetComponent<RectTransform>();
             rrt.pivot            = new Vector2(0f, 1f);
             rrt.sizeDelta        = new Vector2(RowW, RowH);
             rrt.anchoredPosition = new Vector2(Pad, -Pad - i * (RowH + Pad));
             sel.rowBgs[i] = row.AddComponent<Image>();
-            var lang = (Loc.Lang)i;
             row.AddComponent<Button>().onClick.AddListener(() =>
             {
                 SoundManager.Play("click", 0.8f, 0f);
                 Loc.Set(lang);
                 sel.Close();
             });
-            var t = sel.NewText(row.transform, Names[i], 28, Color.white);
+            var t = sel.NewText(row.transform, Names[(int)lang], 26, Color.white);
             t.fontStyle = FontStyle.Bold;
             sel.rowTexts[i] = t;
         }
@@ -133,10 +140,11 @@ public class LanguageSelector : MonoBehaviour
         int cur = (int)Loc.Current;
         for (int i = 0; i < rowBgs.Length; i++)
         {
-            bool on = i == cur;
+            int  lang = (int)Order[i];
+            bool on   = lang == cur;
             rowBgs[i].color   = on ? RowSelected : RowColor;
             rowTexts[i].color = on ? Color.black : Color.white;
-            rowTexts[i].text  = (on ? "✓ " : "") + Names[i];
+            rowTexts[i].text  = (on ? "✓ " : "") + Names[lang];
         }
         if (codeBadge != null) codeBadge.text = Codes[cur];
     }

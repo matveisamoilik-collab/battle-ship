@@ -24,7 +24,7 @@ ShipButtlr is a Unity 6 (6000.3.7f1) 3D naval action game — a 1v1 torpedo batt
 | `"FreeBoxes"` | int | 0 | Free loot boxes left (granted by `10box`; spent before coins) |
 | `"Promo_10box"` | int | 0 | 1 = `10box` already redeemed |
 | `"CurrentLevel"` | int | 1 | Highest unlocked level: 1–7 (`GameManager.MaxLevel = 7`) |
-| `"Language"` | string | device language | UI language: `"en"`, `"ru"`, `"pl"` or `"vot"` (managed by `Loc`) |
+| `"Language"` | string | device language | UI language: `"en"`, `"ru"`, `"pl"`, `"vot"`, `"be"`, `"uk"`, `"es"`, `"zh"` or `"ar"` (managed by `Loc`) |
 
 ## Development Workflow
 
@@ -362,15 +362,17 @@ A full-screen map modal on the MainMenu opened via the **MAP** button (between P
 ### Adding New Islands
 Islands are created in `GameSetup.CreateIsland(Vector3 pos, float radius, int treeCount, mats, Transform parent = null)`. Each island root gets an `IslandData` component (runtime data) and the `"Island"` tag. All calls in `BuildGameScene()` pass `islandsRootGO.transform` as the parent so the levels system can toggle them. To add an island: add a `CreateIsland(...)` call in `BuildGameScene()` with `islandsRootGO.transform` as the parent — no other changes needed.
 
-### Localization (EN / RU / PL / Votic)
+### Localization (EN / RU / PL / BE / UK / ES / ZH / AR / Votic)
 
-`Assets/Scripts/Localization.cs` — static `Loc` class. **Keys are the English strings**; the table in the static constructor maps each key to Russian and Polish (`Add(en, ru, pl)`); Votic lines are added separately in `AddVotic()` (`Vo(en, vot)`, a missing one falls back to English).
+`Assets/Scripts/Localization.cs` — static `Loc` class. **Keys are the English strings**; the table in the static constructor maps each key to Russian and Polish (`Add(en, ru, pl)`); Votic lines are added separately in `AddVotic()` (`Vo(en, vot)`); Belarusian, Ukrainian, Spanish, Chinese (Simplified) and Arabic in `AddMore()` (`More(en, be, uk, es, zh, ar)`). A missing entry falls back to English.
+- **Arabic** (`ArabicText.cs`): legacy `Text` draws left-to-right and never joins letters, so `More()` stores Arabic already shaped: letters → presentation forms (isolated/final/initial/medial, lam-alef ligatures) and the string in visual right-to-left order (Latin/digit runs and `{0}` placeholders keep their order, brackets mirrored). `string.Format` fills placeholders afterwards. Write Arabic in normal logical order without diacritics; keep it short (single line — a wrapped Arabic line would come out in the wrong line order). `"{0}!"` is a key so the `!` lands on the correct side (and Spanish gets `¡…!`).
+- **Chinese** relies on the OS font fallback of the dynamic `LegacyRuntime.ttf` font (works in the Windows editor and on Android, which ship CJK fonts); no font asset is bundled.
 - **Votic (`vot`) is an unverified draft** written without a speaker (Finnic roots + Russian loans). Have it checked against the *Vadja keele sõnaraamat* or by a Votic speaker before relying on it. It is never chosen automatically (no `SystemLanguage` value), only via the selector.
 - `Loc.T(key)` translates a literal, `Loc.F(formatKey, args)` translates a format string (`"COINS: {0}"`, `"LEVEL: {0}"` …). Every string that code writes to a `Text` must go through one of them.
 - Scene texts built by `GameSetup` stay English in the scene. On every scene load and on every language switch, `Loc` rewrites every `Text` (incl. inactive) whose text is a known string in **any** language, so no Build All is needed. It also turns on best fit (`Loc.Fit`, down to half size) so longer translations shrink instead of overflowing. Two keys must never share a translation (a `[Loc]` warning is logged).
-- Language: PlayerPrefs `"Language"`; on first launch it follows `Application.systemLanguage` (Russian / Belarusian / Ukrainian → RU, Polish → PL, otherwise EN). `Loc.Set(lang)` saves, retranslates and raises `Loc.Changed` (`MainMenu` refreshes coins / level / shop, `LanguageSelector` its highlight).
-- `LanguageSelector.cs`: a **globe icon** (drawn in code, no image asset; small badge shows the current code EN / RU / PL / VOT) in the top-right of the main menu. Tapping it opens a dropdown listing the languages in their own names (ENGLISH / РУССКИЙ / POLSKI / VAĐĐA (BETA), current one gold with ✓); tapping a language switches and closes it, tapping anywhere else closes it (invisible full-screen `Blocker`). Built at runtime by `MainMenu.Start()` and placed right after `CoinText` so the shop / map panels cover it. The language can only be changed in the main menu.
-- **Adding UI text:** add an `Add("ENGLISH", "РУССКИЙ", "POLSKI")` line plus a `Vo("ENGLISH", "VAĐĐA")` line and use `Loc.T` / `Loc.F` in code. Map images (`Assets/Resources/Level_*.png`) have English island names baked in and are not translated; debug buttons (`DBG`, F-keys) stay English.
+- Language: PlayerPrefs `"Language"`; on first launch it follows `Application.systemLanguage` (Russian, Belarusian, Ukrainian, Polish, Spanish, Chinese (any) and Arabic map to their language, otherwise EN). `Loc.Set(lang)` saves, retranslates and raises `Loc.Changed` (`MainMenu` refreshes coins / level / shop, `LanguageSelector` its highlight).
+- `LanguageSelector.cs`: a **globe icon** (drawn in code, no image asset; small badge shows the current code, e.g. EN / ZH / AR) in the top-right of the main menu. Tapping it opens a dropdown listing the languages in their own names (ENGLISH, ESPAÑOL, POLSKI, РУССКИЙ, УКРАЇНСЬКА, БЕЛАРУСКАЯ, 中文, العربية, VAĐĐA (BETA); current one gold with ✓); tapping a language switches and closes it, tapping anywhere else closes it (invisible full-screen `Blocker`). Built at runtime by `MainMenu.Start()` and placed right after `CoinText` so the shop / map panels cover it. The language can only be changed in the main menu.
+- **Adding UI text:** add an `Add("ENGLISH", "РУССКИЙ", "POLSKI")` line plus a `Vo(...)` and a `More(...)` line and use `Loc.T` / `Loc.F` in code. Map images (`Assets/Resources/Level_*.png`) have English island names baked in and are not translated; debug buttons (`DBG`, F-keys) stay English.
 
 ### Sound
 
